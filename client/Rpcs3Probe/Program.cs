@@ -28,24 +28,30 @@ Console.WriteLine($"  money  0x{Addresses.Money:X8}  {U32(Addresses.Money),8}");
 Console.WriteLine($"  hp     0x{Addresses.HealthCurrent:X8}  {U16(Addresses.HealthCurrent),8} / {U16(Addresses.HealthMax)}");
 Console.WriteLine($"  exp    0x{Addresses.Exp:X8}  {U32(Addresses.Exp),8}");
 
-Console.WriteLine("\ninventory:");
-var raw = target.ReadMemory(Inventory.Base, Inventory.Slots * Inventory.Stride);
-var any = false;
-for (var i = 0; i < Inventory.Slots; i++)
+Console.WriteLine("\ninventory region, 8-byte records from 0x01534DE4:");
+const int show = 40;
+var raw = target.ReadMemory(Inventory.Base, show * Inventory.Stride);
+for (var i = 0; i < show; i++)
 {
     var span = raw.AsSpan(i * Inventory.Stride, Inventory.Stride);
     var id = BinaryPrimitives.ReadUInt16BigEndian(span[..2]);
+    var pad = BinaryPrimitives.ReadUInt16BigEndian(span[2..4]);
     var qty = BinaryPrimitives.ReadUInt32BigEndian(span[4..8]);
-    if (id == 0 && qty == 0) continue;
-    var name = Inventory.KnownItems.TryGetValue(id, out var known) ? known : "?";
-    Console.WriteLine($"  slot {i}: id={id} x{qty}  {name}");
-    any = true;
+    var addr = Inventory.Base + (uint)(i * Inventory.Stride);
+    Console.WriteLine($"  {i,2}  0x{addr:X8}  id={id,-5} pad={pad,-5} qty={qty,-10}  {Convert.ToHexString(span)}");
 }
-if (!any) Console.WriteLine("  (empty)");
+
+// Slot 12 is the first locked slot (id=1). Clearing it to zeros should turn
+// it into an unlocked empty slot if the marker is what gates availability.
+var lockedSlot = Inventory.Base + 12 * Inventory.Stride;
+Console.WriteLine($"\nunlock test on slot 12 (0x{lockedSlot:X8}):");
+Console.WriteLine($"  before  {Convert.ToHexString(target.ReadMemory(lockedSlot, 8))}");
+target.WriteMemory(lockedSlot, new byte[8]);
+Console.WriteLine($"  after   {Convert.ToHexString(target.ReadMemory(lockedSlot, 8))}  (zeroed)");
+Console.WriteLine("  -> check the in-game inventory: 13 slots usable now?");
 
 foreach (var (label, where, size) in new[]
 {
-    ("scratch padding", Addresses.ScratchBase, 8),
     ("exp mirror (inert, in RW data)", Addresses.ExpMirror, 4),
 })
 {

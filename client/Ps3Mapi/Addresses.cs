@@ -31,23 +31,47 @@ public static class Addresses
 }
 
 // 8-byte records at stride 8: [u16 id][u16 pad][u32 quantity].
+//   id 0, qty 0  unlocked and empty
+//   id 1, qty 1  LOCKED slot - not an item
+//   anything else is an item
 public static class Inventory
 {
     public const uint Header = 0x01534DE0;
     public const uint Base = 0x01534DE4;
     public const int Stride = 8;
+    public const int Slots = 24;
 
-    // A different structure starts at 0x01534E40, 92 bytes past Base. Raising
-    // this lets FindFreeSlot return an address outside the array.
-    public const int Slots = 11;
+    public const ushort EmptyId = 0;
+    public const ushort LockedId = 1;
+
+    public static readonly byte[] LockedRecord = [0, 1, 0, 0, 0, 0, 0, 1];
+    public static readonly byte[] EmptyRecord = new byte[Stride];
 
     public readonly record struct Item(ushort Id, uint Quantity)
     {
-        public bool IsEmpty => Id == 0 && Quantity == 0;
+        public bool IsEmpty => Id == EmptyId && Quantity == 0;
+        public bool IsLocked => Id == LockedId;
+        public bool IsItem => !IsEmpty && !IsLocked;
     }
 
+    // Inferred from a shop run, assuming slots fill in purchase order.
     public static readonly IReadOnlyDictionary<ushort, string> KnownItems =
-        new Dictionary<ushort, string> { [11] = "Tauriner" };
+        new Dictionary<ushort, string>
+        {
+            [11] = "Tauriner",
+            [12] = "Tauriner+",
+            [49] = "Oden Soup",
+            [50] = "Seaweed Rice Ball",
+            [51] = "Tuna Rice Ball",
+            [52] = "Salmon Rice Ball",
+            [53] = "Bento Lunch Set",
+            [55] = "Club Sandwich",
+            [56] = "Tuna & Egg Sandwich",
+            [57] = "Special Yakisoba",
+            [58] = "Steamed Bun",
+            [59] = "Bean Paste Bun",
+            [61] = "Sake",
+        };
 
     public static byte[] MakeRecord(ushort itemId, uint quantity = 1)
     {
