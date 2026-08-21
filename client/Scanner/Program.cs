@@ -40,14 +40,38 @@ int Unknown() { Usage(); return 1; }
 
 async Task<int> Snap(string name)
 {
-    var host = Ps3Config.Require(Opt("--host"));
-    var pid = await Ps3Console.FindGameAsync(host);
-    if (pid is null) { Console.WriteLine("No game running."); return 1; }
+    IMemoryTarget target;
+    IDisposable? owned = null;
+    // Only PS3MAPI has a per-request cap; local memory has none.
+    var chunk = Ps3MapiClient.MaxRead;
 
-    using var client = new Ps3MapiClient(host);
-    client.Connect();
-    var game = new GameProcess(client, pid.Value);
-    Console.WriteLine($"attached 0x{pid:X8}");
+    if (Flag("--rpcs3"))
+    {
+        var rpcs3 = Rpcs3Target.Attach();
+        if (rpcs3 is null)
+        {
+            Console.WriteLine("RPCS3 is not running, or no game is loaded in it.");
+            return 1;
+        }
+        owned = rpcs3;
+        target = rpcs3;
+        chunk = int.MaxValue;
+        Console.WriteLine($"attached rpcs3 pid {rpcs3.ProcessId}, guest base 0x{rpcs3.GuestBase:X}");
+    }
+    else
+    {
+        var host = Ps3Config.Require(Opt("--host"));
+        var pid = await Ps3Console.FindGameAsync(host);
+        if (pid is null) { Console.WriteLine("No game running."); return 1; }
+
+        var client = new Ps3MapiClient(host);
+        client.Connect();
+        owned = client;
+        target = new GameProcess(client, pid.Value);
+        Console.WriteLine($"attached 0x{pid:X8}");
+    }
+
+    using var _ = owned;
 
     const uint start = Addresses.DataBase, end = Addresses.DataEnd;
     var total = (int)(end - start);
@@ -57,8 +81,8 @@ async Task<int> Snap(string name)
     var step = 0;
     while (done < total)
     {
-        var want = Math.Min(Ps3MapiClient.MaxRead, total - done);
-        game.Read(start + (uint)done, want).CopyTo(buffer, done);
+        var want = (int)Math.Min((long)chunk, total - done);
+        target.ReadMemory(start + (uint)done, want).CopyTo(buffer, done);
         done += want;
         var pct = done * 10 / total;
         if (pct > step) { step = pct; Console.Write($"\r  sweeping {pct * 10,3}%"); }
@@ -171,13 +195,18 @@ void Usage() => Console.WriteLine($"""
       slots <a> <b> <c>           slot-array fill pattern across three snaps
 
     options:
+      --rpcs3                     read a running RPCS3 instead of the console
       --host <ip>                 console address (only 'snap' needs it)
       --width u8|u16|u32|f32      default u32
       --all                       run every width
       --limit N                   max hits to print (default 20)
 
-    Only 'snap' talks to the console; everything else works offline on saved
+    Only 'snap' reads a target; everything else works offline on saved
     snapshots, so one capture can be reinterpreted at any width.
+
+    Guest addresses are the same on hardware and in RPCS3, so snapshots from
+    either are interchangeable. --rpcs3 reads local memory rather than a
+    ~1.3 MB/s network link, so sweeps are far faster.
 
     {Ps3Config.HelpText}
     """);

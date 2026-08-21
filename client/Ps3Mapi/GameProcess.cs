@@ -47,7 +47,7 @@ public static partial class Ps3Console
     }
 }
 
-public sealed class GameProcess(Ps3MapiClient client, uint pid, string name = "")
+public sealed class GameProcess(Ps3MapiClient client, uint pid, string name = "") : IMemoryTarget
 {
     public uint Pid { get; } = pid;
     public string Name { get; } = name;
@@ -55,6 +55,9 @@ public sealed class GameProcess(Ps3MapiClient client, uint pid, string name = ""
 
     public byte[] Read(uint address, int size) => Client.ReadMemory(Pid, address, size);
     public void Write(uint address, ReadOnlySpan<byte> data) => Client.WriteMemory(Pid, address, data);
+
+    byte[] IMemoryTarget.ReadMemory(uint address, int size) => Read(address, size);
+    void IMemoryTarget.WriteMemory(uint address, ReadOnlySpan<byte> payload) => Write(address, payload);
 
     public byte ReadU8(uint address) => Read(address, 1)[0];
     public ushort ReadU16(uint address) => BinaryPrimitives.ReadUInt16BigEndian(Read(address, 2));

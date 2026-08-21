@@ -63,11 +63,43 @@ Empire Earth project leaned hard on hardware breakpoints (see its REVERSE.md,
 "Hardware breakpoints: what was learned"). Without the emulator as a lab, that
 entire technique is gone and the work becomes blind poking over a socket.
 
-**To verify, not assume:** the same game version and patch level must be on both
-sides. Heap pointers will hold different absolute values run to run — the
-*chain* (static base + offsets) is what carries over, not the resolved address.
-Spot-check a handful of statics through `tools/probe.py` before building on
-this.
+### VERIFIED 2026-08-21 — addresses are identical on both
+
+The parity check passed. With the same save loaded in RPCS3, every address found
+on hardware read correctly in the emulator, **at the same guest address, with no
+translation**:
+
+| | Hardware | RPCS3 |
+|---|---|---|
+| ELF header at `0x00010000` | `7F454C4602020166` | `7F454C4602020166` |
+| money `0x01537E18` | 60000 | 60000 |
+| HP `0x0154BDB4/B6` | 300 / 300 | 300 / 300 |
+| exp `0x0154BDCC` | 0 | 0 |
+
+So the no-ASLR argument holds in practice, and the plan is sound: **find it in
+the emulator, ship it to hardware.**
+
+### Reading RPCS3
+
+RPCS3 maps the guest address space into its own process at a fixed base — on
+64-bit Windows that is **`0x300000000`**, so a guest address is simply
+`base + address`. `Rpcs3Target` (in the Ps3Mapi library) attaches with
+`ReadProcessMemory` and confirms the base by checking for the EBOOT's ELF magic
+at guest `0x00010000`, falling back to walking committed regions if the fixed
+base ever moves.
+
+Two consequences worth planning around:
+
+- **Breakpoints are now available.** RPCS3 has a real debugger, so "what writes
+  this address" is answerable — the single technique the Empire Earth project
+  leaned on hardest and that retail hardware cannot provide.
+- **Scanning the emulator is local memory, not a 1.3 MB/s network link.** A
+  sweep that costs ~3 seconds against the console is essentially instant
+  against RPCS3. For the search-heavy phase, the emulator is simply the better
+  target, and anything found there transfers unchanged.
+
+Caveat that still stands: heap pointers hold different absolute values run to
+run. The *chain* (static base + offsets) carries over, not a resolved address.
 
 ---
 
