@@ -43,6 +43,15 @@ for (var i = 0; i < items.Length; i++)
 var free = Inventory.FindFreeSlot(game);
 Console.WriteLine($"  first free slot: 0x{free:X8}");
 
+Console.WriteLine("\nsegment layout (from the live ELF headers):");
+var layout = ElfMap.Read(game);
+Console.WriteLine($"  entry 0x{layout.Entry:X8}");
+foreach (var seg in layout.Segments.Where(x => x.MemorySize > 0))
+    Console.WriteLine($"  {seg.FlagString,3}  0x{seg.VirtualAddress:X8} - 0x{seg.End:X8}  {seg.MemorySize / 1024.0 / 1024:F1} MB");
+
+var notifier = new Notifier(host);
+Console.WriteLine($"\nCCAPI reachable: {await notifier.IsCcapiAvailableAsync()}");
+
 var sw = Stopwatch.StartNew();
 const int n = 10;
 for (var i = 0; i < n; i++) game.Read(Addresses.DataBase, 65536);

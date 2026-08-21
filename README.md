@@ -38,8 +38,7 @@ is a workbench; the deliverable runs on the real machine.
   the tools fall back to a read-only HTTP path that cannot write.
 - **Yakuza: Dead Souls.** Developed against `NPEB02034`, the EU PSN digital
   release. The disc releases are unverified — addresses will differ.
-- **Python 3.11+** on the PC. 64-bit is fine — nothing here loads `CCAPI.dll`,
-  deliberately. See [`tools/ccapi.py`](tools/ccapi.py) for why.
+- **.NET 9 SDK** on the PC.
 - Console and PC on the same LAN.
 
 Developed against a Slim CECH-25xx running **Evilnat 4.93 (Cobra 8.5)**. CCAPI
@@ -49,61 +48,66 @@ is optional; if present it is used for nicer notifications and nothing else.
 
 ## What works today
 
-The link, verified end to end against a real console running the real game.
+Everything a multiworld client needs, verified against a real console running
+the real game: read, write, on-screen messaging, and granting an item.
 
 ```bash
-py tools/probe.py 192.168.1.129 --notify
+dotnet run --project client/Probe -- 192.168.1.129
 ```
 
-Lists processes, attaches to the game, reads its ELF header to prove the bytes
-are not being corrupted, benchmarks the round trip, and fires an on-screen
-toast. `--addr <hex>` dumps 64 bytes anywhere — the tool for the address parity
-check against RPCS3. `--scan` shows which console services are up.
+Lists processes, attaches, proves the bytes are not corrupted by reading the
+ELF header, prints money/HP/EXP/inventory, dumps the segment layout from the
+live ELF program headers, and benchmarks the link (~1.3 MB/s).
 
 ```bash
-py tools/elfmap.py 192.168.1.129
+dotnet run --project client/Scanner -- 192.168.1.129 snap before
+# change something in game
+dotnet run --project client/Scanner -- 192.168.1.129 snap after
+dotnet run --project client/Scanner -- 192.168.1.129 delta before after 50 --all
 ```
 
-Reads the running game's own ELF program headers to map its segments. On the
-confirmed target (`NPEB02034`, EU PSN digital) that gives:
+Value scanner. A full 4 MB sweep of the data segment takes about three seconds,
+so every pass re-reads everything and filters offline — which means one capture
+can be reinterpreted at every width instead of committing to a guess.
 
-| Segment | Range | Size | What it is for |
-|---|---|---|---|
-| code (RX) | `0x00010000` – `0x01310768` | 19.0 MB | function addresses; load this in Ghidra |
-| data (RW) | `0x01320000` – `0x0172C408` | 4.0 MB | game state; point the value scanner here |
+| Command | What it does |
+|---|---|
+| `snap <name>` | sweep and save |
+| `eq <snap> <value>` | addresses holding a value |
+| `delta <a> <b> <n>` | values that changed by exactly `n` |
+| `filter <a> <b> <mode>` | changed / unchanged / increased / decreased |
+| `slots <a> <b> <c>` | slot-array fill pattern across three snapshots |
 
-ELF64 big-endian, PPC64, entry `0x01353C20`.
-
-```bash
-py tools/scan.py 192.168.1.129 --new --eq 5000
-```
-
-Value scanner — the Cheat Engine step, over the network. Sweeps the whole 4 MB
-data segment in under four seconds, so every pass re-reads everything and
-filters locally. Chain passes to narrow down:
-
-```bash
-py tools/scan.py 192.168.1.129 --new --eq 5000   # money is 5000
-# spend some money in game
-py tools/scan.py 192.168.1.129 --eq 4200         # now it is 4200
-py tools/scan.py 192.168.1.129 --list
-```
-
-Unknown-value searches work too — `--new --unknown`, then `--increased`,
-`--decreased`, `--changed` or `--unchanged` as the value moves. Widths `--u8`,
-`--u16`, `--u32` (default) and `--f32`, all read big-endian.
+The last two are the ones that actually cracked this game. `delta` found EXP
+after a direct value search returned **zero hits at every width** — the game
+stores experience counting up while the UI shows a countdown. `slots` found the
+inventory, whose signature is two *different* addresses receiving the *same*
+item id at different times, because items here do not stack.
 
 ---
+
+## Languages
+
+**C# / .NET 9 everywhere except the apworld.**
+
+The apworld has to be Python — Archipelago's world API *is* Python, and
+`.apworld` is a zipped Python package loaded inside the generator's process.
+That part is small and never touches the PS3: item and location tables, logic
+rules, options.
+
+Everything else is C#, which is not just preference. The PS3 tooling ecosystem
+is overwhelmingly C# — PS3Lib, NetCheatPS3, and Dnawrkshp's PS3MAPI-NCAPI,
+whose protocol this transport was written from — and Archipelago ships an
+official [.NET client library](https://www.nuget.org/packages/Archipelago.MultiClient.Net)
+with no dependencies.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
-| `tools/ps3mapi.py` | PS3MAPI client — the PS3 analogue of EE's `Memory.py` |
-| `tools/ccapi.py` | CCAPI's HTTP surface: notifications. Not memory, and the file explains why |
-| `tools/probe.py` | Acceptance test for the link, and a memory dumper |
-| `tools/elfmap.py` | Reads the running game's segment layout from its ELF headers |
-| `tools/scan.py` | Value scanner over the data segment — finds addresses for game state |
+| `client/Ps3Mapi/` | Transport, typed big-endian access, addresses, inventory, notifications |
+| `client/Probe/` | Acceptance test for the link |
+| `client/Scanner/` | Value scanner over the data segment |
 | `assets/archipelago.png` | The Archipelago logo, 512x512, for stage-2 in-game UI |
 | `notes/REVERSE.md` | Findings, decisions, dead ends |
 
