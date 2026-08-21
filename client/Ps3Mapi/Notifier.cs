@@ -1,14 +1,10 @@
 namespace YakuzaDeadSouls.Ps3;
 
-// Toasts render over the running game and queue, so bursts need no throttle.
-// CCAPI honours icons but not sound; webMAN honours sound but not icons.
 public sealed class Notifier(string host)
 {
     public const int CcapiPort = 6333;
     public const int MaxLength = 199;
 
-    // Ids as observed on hardware, which is not what CCAPI's header declares
-    // (it calls 12 "Finger"). An unmapped id silently draws the info icon.
     public enum Icon
     {
         Info = 0,

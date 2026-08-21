@@ -1,16 +1,6 @@
 using System.Buffers.Binary;
 using YakuzaDeadSouls.Ps3;
 
-// ydsitems <command> [options]
-//
-//   read                 dump the 24 inventory slots
-//   unlock               clear the locked marker from every slot
-//   fill <ids>           write ids into the slots, comma/range separated
-//   next                 fill with the next 24 unidentified ids
-//   restore              put back whatever `fill` last overwrote
-//
-// Options: --rpcs3 (default), --host <ip>
-
 if (args.Length < 1) { Usage(); return 0; }
 
 var command = args[0].ToLowerInvariant();
@@ -89,6 +79,29 @@ switch (command)
         }
         else Console.WriteLine("ids needs --rpcs3");
         break;
+    case "peek":
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var addr = Convert.ToUInt32(bare[0], 16);
+        var len = bare.Length > 1 ? int.Parse(bare[1]) : 32;
+        var raw = target.ReadMemory(addr, len);
+        for (var i = 0; i < len; i += 16)
+            Console.WriteLine($"  0x{addr + (uint)i:X8}  {Convert.ToHexString(raw.AsSpan(i, Math.Min(16, len - i)))}");
+        break;
+    }
+    case "poke":
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var addr = Convert.ToUInt32(bare[0], 16);
+        var value = uint.Parse(bare[1]);
+        var width = bare.Length > 2 ? int.Parse(bare[2]) : 4;
+        Console.WriteLine($"  before  {Convert.ToHexString(target.ReadMemory(addr, width))}");
+        var buf = new byte[width];
+        for (var i = 0; i < width; i++) buf[width - 1 - i] = (byte)(value >> (i * 8));
+        target.WriteMemory(addr, buf);
+        Console.WriteLine($"  after   {Convert.ToHexString(target.ReadMemory(addr, width))}  (wrote {value})");
+        break;
+    }
     default: Usage(); break;
 }
 return 0;

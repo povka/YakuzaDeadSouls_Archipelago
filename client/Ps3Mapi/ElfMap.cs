@@ -2,8 +2,6 @@ using System.Buffers.Binary;
 
 namespace YakuzaDeadSouls.Ps3;
 
-// The EBOOT is mapped with its ELF header at 0x00010000, so the segment
-// layout can be read straight out of the live process.
 public static class ElfMap
 {
     public readonly record struct Segment(
@@ -32,8 +30,6 @@ public static class ElfMap
             throw new Ps3Exception(
                 $"no ELF magic at {Addresses.EbootBase:X8} - got {Convert.ToHexString(header[..8])}");
 
-        // ELF64 big-endian. Entry points at a function descriptor in the data
-        // segment, not at code - normal for the PPC64 ELFv1 ABI.
         var entry = (uint)BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(24, 8));
         var phoff = BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(32, 8));
         var phentsize = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(54, 2));

@@ -14,11 +14,6 @@ public static class FindStrings
             ("utf16be", Encoding.BigEndianUnicode.GetBytes(needle)),
         };
 
-        // Guest RAM on PS3 is 256 MB. Sweep it in chunks and look for the name
-        // anywhere, not just in the segments we already know about.
-        // Guest RAM is mapped sparsely and the game's heap sits far above the
-        // EBOOT, so walk the regions the process actually has rather than
-        // sweeping a guessed range.
         const int chunk = 4 * 1024 * 1024;
         const int overlap = 64;
 
@@ -99,8 +94,6 @@ public static class FindStrings
         }
     }
 
-    // The names sit as consecutive NUL-terminated strings in the same order as
-    // their ids, so walking forward from a known anchor assigns every id.
     public static void DumpIds(Rpcs3Target target, uint at, ushort firstId, int count, bool asCode)
     {
         var raw = target.ReadMemory(at, 65536);

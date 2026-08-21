@@ -461,6 +461,50 @@ amount of scanning would have found this while searching for the wrong shape.
 One sentence of "items don't stack here" was worth more than the whole filter
 pipeline.
 
+### Chapter progression: no sequential counter exists
+
+Tested properly across **two** chapter transitions (1→2 and 2→3), with two idle
+snapshots taken beforehand to subtract ambient churn (~1600 u32 addresses move
+on their own while standing still).
+
+**Zero addresses went 1 → 2 → 3, at any width.** So the game does not keep a
+simple incrementing chapter number. That fits the on-screen text being
+"Part I Chapter 2: Cut Off" — a named entry, likely keyed by scene id rather
+than a sequence.
+
+Five addresses did go 1 → 2 at the first transition. All were eliminated by
+watching them live through the second:
+
+| Address | Behaviour | Verdict |
+|---|---|---|
+| `0x01657DA8`, `0x016F3E48` | move in lockstep, random small values | per-frame / RNG |
+| `0x013A19B0`, `0x013A19B8` | flicker to `0xFFFFFFFF` and back | transient "current X" index |
+| `0x0160984C` | 0 → 1 → 2 within one transition | scene counter, not chapter |
+
+Note none of them drove the pause-menu chapter text either - poking them to 7,
+3, 4, 5, 6 changed nothing on screen.
+
+**Why a chapter counter was the wrong target anyway.** For Archipelago we do not
+need the chapter *number*, only a reliable signal that a chapter ended. And a
+chapter transition is the worst possible event to diff against: it reloads an
+area and rewrites megabytes. A bit-accumulation search over both transitions
+found 7,416 candidate flag bytes in 331 clusters - far too many to act on.
+
+**The right event is a small one.** A substory completion is discrete, sets
+presumably one flag, does not reload the map, and is itself the location we
+want. Substories unlock in chapter 3. Take the idle pair standing next to the
+NPC, complete it, snapshot before moving anywhere, and the diff should be tiny.
+
+Regions worth re-checking once a clean substory diff narrows things down - these
+gained bits at *both* transitions rather than only the second, which is the
+flag-like signature:
+
+```
+0x0164A407 - 0x0164A6EA    e.g. 0x0164A41B  00 -> 80 -> C0
+                                0x0164A41F  30 -> B0 -> F0
+0x0150EACC - 0x0150EE9F    changed at the first transition, stable after
+```
+
 ### The character stats struct at `0x0154BDB0`
 
 Three of the five confirmed values live in one structure, which makes its

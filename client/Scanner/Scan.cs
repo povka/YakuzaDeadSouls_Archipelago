@@ -13,7 +13,6 @@ public static class Widths
         _ => 4,
     };
 
-    // Everything reads as double so one comparison path serves all widths.
     public static double Read(this Width w, ReadOnlySpan<byte> data, int offset) => w switch
     {
         Width.U8 => data[offset],
@@ -22,7 +21,6 @@ public static class Widths
         _ => BinaryPrimitives.ReadSingleBigEndian(data.Slice(offset, 4)),
     };
 
-    // Most of a data segment reinterpreted as float is noise.
     public static bool Plausible(this Width w, double v) =>
         w != Width.F32 || (!double.IsNaN(v) && !double.IsInfinity(v) && Math.Abs(v) < 1e9);
 
@@ -112,8 +110,6 @@ public static class Compare
         return hits;
     }
 
-    // For values shown as a countdown, percentage or bar, where the displayed
-    // number is derived and searching for it directly finds nothing.
     public static List<Hit> Delta(Snapshot before, Snapshot after, Width w, double delta,
                                   double tolerance = 1e-3)
     {
@@ -143,19 +139,29 @@ public static class Compare
             var c = after.Read(w, off);
             if (!w.Plausible(a) || !w.Plausible(b) || !w.Plausible(c)) continue;
 
-            if (a != b) continue;      // churns on its own
-            if (b == c) continue;      // the event did not touch it
             hits.Add(new Hit(idleB.Base + (uint)off, b, c));
+        }
+        return hits;
+    }
+
+    public static List<Hit> EventTransition(Snapshot idleA, Snapshot idleB, Snapshot after,
+                                            Width w, double from, double to)
+    {
+        var size = w.Size();
+        var limit = Math.Min(Math.Min(idleA.Data.Length, idleB.Data.Length), after.Data.Length);
+        var hits = new List<Hit>();
+        for (var off = 0; off + size <= limit; off += size)
+        {
+            if (idleA.Read(w, off) != from) continue;
+            if (idleB.Read(w, off) != from) continue;
+            if (after.Read(w, off) != to) continue;
+            hits.Add(new Hit(idleB.Base + (uint)off, from, to));
         }
         return hits;
     }
 
     public readonly record struct SlotPair(uint First, uint Second, double Value);
 
-    // Finds a slot array filled one entry at a time, from three snapshots. For
-    // items that do not stack there is no count to watch; the signature is two
-    // different addresses taking the same value at different times:
-    //   slot A: 0 -> id -> id      slot B: 0 -> 0 -> id
     public static List<SlotPair> SlotFills(Snapshot a, Snapshot b, Snapshot c, Width w,
                                            uint maxGap = 0x400)
     {

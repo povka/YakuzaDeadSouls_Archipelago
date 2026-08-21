@@ -25,8 +25,6 @@ public static partial class Ps3Console
         var found = new List<ProcessEntry>();
         foreach (Match m in OptionPattern().Matches(html))
         {
-            // Plain numeric values are pseudo-targets (LV1/LV2 Memory, Flash,
-            // /dev_hdd0), not processes.
             var raw = m.Groups[1].Value;
             if (!raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) continue;
             if (uint.TryParse(raw[2..], System.Globalization.NumberStyles.HexNumber,
@@ -95,7 +93,6 @@ public sealed class GameProcess(Ps3MapiClient client, uint pid, string name = ""
         return Encoding.UTF8.GetString(raw, 0, end < 0 ? raw.Length : end);
     }
 
-    // Catches both a wrong PID (reads zeros) and a corrupting transport.
     public bool LooksLikeGame()
     {
         var head = Read(Addresses.EbootBase, 8);

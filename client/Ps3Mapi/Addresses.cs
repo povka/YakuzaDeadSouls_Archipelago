@@ -54,8 +54,6 @@ public static class Inventory
         public bool IsItem => !IsEmpty && !IsLocked;
     }
 
-    // Names come from data/items.tsv, dumped from the game's own name table
-    // in memory. Ids 2-1127; the game marks its own category boundaries.
     public const ushort FirstId = 2;
     public const ushort LastId = 1127;
     public const ushort EndOfWeapons = 764;
@@ -95,8 +93,6 @@ public static class Inventory
         return null;
     }
 
-    // The table is padded with placeholders the game never uses. Keep them out
-    // of any randomizer item pool.
     public static bool IsPlaceholder(string name) =>
         name.StartsWith("Dummy", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("Temp ", StringComparison.OrdinalIgnoreCase)

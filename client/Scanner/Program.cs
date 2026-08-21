@@ -28,6 +28,7 @@ try
         "slots" => Slots(Positional(0)!, Positional(1)!, Positional(2)!),
         "event" => Event(Positional(0)!, Positional(1)!, Positional(2)!),
         "list" => List(),
+        "watch" => await WatchCmd(),
         _ => Unknown(),
     };
 }
@@ -97,6 +98,34 @@ async Task<int> Snap(string name)
     return 0;
 }
 
+async Task<int> WatchCmd()
+{
+    var listArg = Positional(0) ?? Path.Combine(outDir, "..", "data", "chapter_candidates.txt");
+    var path = File.Exists(listArg) ? listArg
+        : Path.GetFullPath(Path.Combine(outDir, "..", "data", listArg));
+    var addresses = Watch.LoadList(path);
+    if (addresses.Count == 0) { Console.WriteLine($"no addresses in {path}"); return 1; }
+
+    var width = int.TryParse(Opt("--width2"), out var w2) ? w2 : 4;
+    var interval = int.TryParse(Opt("--interval"), out var ms) ? ms : 500;
+
+    if (Flag("--rpcs3"))
+    {
+        var rpcs3 = Rpcs3Target.Attach();
+        if (rpcs3 is null) { Console.WriteLine("RPCS3 not running."); return 1; }
+        using (rpcs3) Watch.Run(rpcs3, addresses, width, interval, false);
+        return 0;
+    }
+
+    var host = Ps3Config.Require(Opt("--host"));
+    var pid = await Ps3Console.FindGameAsync(host);
+    if (pid is null) { Console.WriteLine("No game running."); return 1; }
+    using var client = new Ps3MapiClient(host);
+    client.Connect();
+    Watch.Run(new GameProcess(client, pid.Value), addresses, width, interval, true);
+    return 0;
+}
+
 int List()
 {
     if (!Directory.Exists(outDir)) { Console.WriteLine("no snapshots yet"); return 0; }
@@ -154,6 +183,19 @@ int Filter(string a, string b, string mode)
 int Event(string idleA, string idleB, string after)
 {
     var (a, b, c) = (Snapshot.Load(SnapPath(idleA)), Snapshot.Load(SnapPath(idleB)), Snapshot.Load(SnapPath(after)));
+    var fromArg = Opt("--from");
+    var toArg = Opt("--to");
+    if (fromArg is not null && toArg is not null)
+    {
+        foreach (var w in widths)
+        {
+            var t = Compare.EventTransition(a, b, c, w, double.Parse(fromArg), double.Parse(toArg));
+            Console.WriteLine($"  {w,-4}: {t.Count} went {fromArg} -> {toArg}");
+            foreach (var h in t.Take(limit == 0 ? 40 : limit))
+                Console.WriteLine($"      0x{h.Address:X8}");
+        }
+        return 0;
+    }
     foreach (var w in widths)
     {
         var noisy = Compare.Filter(a, b, w, Compare.Change.Changed).Count;
@@ -205,6 +247,7 @@ void Usage() => Console.WriteLine($"""
 
       snap <name>                 sweep the data segment and save it
       list                        show saved snapshots
+      watch [file]                poll addresses and report changes
       eq <snap> <value>           addresses holding a value
       delta <a> <b> <value>       values that changed by exactly this
       filter <a> <b> <mode>       changed | unchanged | increased | decreased

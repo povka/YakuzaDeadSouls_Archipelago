@@ -1,0 +1,9 @@
+# Addresses that went 1 -> 2 when chapter 1 ended.
+# None of them drives the pause-menu chapter text, but for Archipelago we only
+# need a reliable signal that a chapter ended, not the canonical variable.
+# Whichever of these also goes 2 -> 3 at the next transition is the detector.
+0x013A19B0
+0x013A19B8
+0x0160984C
+0x01657DA8
+0x016F3E48
