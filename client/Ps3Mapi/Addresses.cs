@@ -75,8 +75,10 @@ public static class Inventory
         {
             var tab = line.IndexOf('	');
             if (tab <= 0) continue;
-            if (ushort.TryParse(line[..tab], out var id))
-                names[id] = line[(tab + 1)..];
+            if (!ushort.TryParse(line[..tab], out var id)) continue;
+
+            var name = line[(tab + 1)..].Trim();
+            if (name.Length > 0) names[id] = name;
         }
         return names;
     }
@@ -101,7 +103,8 @@ public static class Inventory
         || name.StartsWith("Start of", StringComparison.OrdinalIgnoreCase);
 
     public static IEnumerable<KeyValuePair<ushort, string>> RealItems =>
-        KnownItems.Where(kv => !IsPlaceholder(kv.Value));
+        KnownItems.Where(kv => kv.Key != EmptyId && kv.Key != LockedId
+                               && !IsPlaceholder(kv.Value));
 
     public static byte[] MakeRecord(ushort itemId, uint quantity = 1)
     {
