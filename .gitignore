@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Game data. Never commit a dump, an EBOOT, or anything decrypted from one.
+*.iso
+*.pkg
+*.self
+*.sprx
+*.elf
+EBOOT.BIN
+PS3_GAME/
+dump/
+game/
+
+# Ghidra
+*.gpr
+*.rep/
+ghidra_projects/
+
+# Local machine specifics
+console.txt
+*.local
+output/
