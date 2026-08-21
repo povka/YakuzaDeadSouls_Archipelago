@@ -24,3 +24,8 @@ ghidra_projects/
 console.txt
 *.local
 output/
+
+# .NET
+bin/
+obj/
+*.user
