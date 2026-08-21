@@ -15,7 +15,8 @@ public static class Addresses
     public const uint DataBase = 0x01320000;
     public const uint DataEnd = 0x0172C408;
 
-    // Unclaimed page padding between the segments: safe to write to.
+    // Unclaimed page padding between the segments. Writable on hardware,
+    // REFUSED by RPCS3. For a write test that works on both, use ExpMirror.
     public const uint ScratchBase = 0x01310768;
 
     public const uint Money = 0x01537E18;

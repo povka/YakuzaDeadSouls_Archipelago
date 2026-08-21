@@ -79,6 +79,60 @@ translation**:
 So the no-ASLR argument holds in practice, and the plan is sound: **find it in
 the emulator, ship it to hardware.**
 
+### THE RULE: design for the console; RPCS3 comes free
+
+RPCS3 is a legitimate **ship** target — plenty of people can emulate but cannot
+get a jailbroken PS3 — but the console sets the constraints. Designing for the
+harder target makes the emulator work for free; the reverse would need a
+rewrite. So: nothing may depend on a capability the console lacks. RPCS3 is allowed for finding addresses, setting
+breakpoints and reading code — its *output* is addresses and offsets, and those
+were verified to transfer unchanged. The scanner is a dev tool and never ships.
+
+The real hazard is not the scanner, it is letting emulator speed leak into the
+**client's runtime design**. At ~2 GB/s, "sweep the data segment every tick and
+diff it" is a perfectly good way to detect checks. On hardware that same sweep
+is **4.0 seconds**. A design validated in the emulator would be dead on arrival
+on the console.
+
+So the client polls a small fixed set of known addresses. Measured budget:
+
+| Approach | Cost per tick | Max rate |
+|---|---|---|
+| 5 addresses, one read each | 305 ms | 3.3 Hz |
+| The same 5 as **2 span reads** | **122 ms** | **8.2 Hz** |
+| Full 4 MB sweep | 4.0 s | unusable |
+
+Two consequences to design around:
+
+1. **Read spans, not addresses.** One 64 KB read costs the same as a 4-byte
+   read, so covering many values in one request is 2.5x better than fetching
+   them individually. `MemoryBlock` exists for exactly this: fetch a span, then
+   slice fields out of it by absolute address.
+2. **Clustering matters.** Everything confirmed so far lives inside a 92 KB
+   window (`0x01534DE4`-`0x0154BDCC`), which two reads cover. Any future value
+   far outside that window costs another whole round trip. If progression flags
+   turn out to be scattered, the answer is **tiered polling** - inventory and
+   health every tick, chapter flags once a second - not more reads per tick.
+
+Anything not yet checked on hardware is unverified, however well it works in
+the emulator.
+
+### Where the two targets actually differ
+
+Very little, which is what makes dual-target shipping cheap. Confirmed so far:
+
+| | Console | RPCS3 |
+|---|---|---|
+| Guest addresses | identical | identical |
+| Reads | 1.3 MB/s | ~2 GB/s |
+| Writes to the RW data segment | yes | **yes** — so granting items works on both |
+| Writes to the inter-segment padding `0x01310768` | yes | **refused** |
+
+The padding is claimed by no program header, so RPCS3 evidently does not map it
+writable where lv2 handed out full pages. It only matters because it was the
+chosen scratchpad for write tests: on RPCS3 use `ExpMirror` (`0x0154BDC8`)
+instead, which sits in the RW segment and is provably inert.
+
 ### Reading RPCS3
 
 RPCS3 maps the guest address space into its own process at a fixed base — on

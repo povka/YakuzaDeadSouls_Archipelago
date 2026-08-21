@@ -42,4 +42,29 @@ for (var i = 0; i < Inventory.Slots; i++)
     any = true;
 }
 if (!any) Console.WriteLine("  (empty)");
+
+foreach (var (label, where, size) in new[]
+{
+    ("scratch padding", Addresses.ScratchBase, 8),
+    ("exp mirror (inert, in RW data)", Addresses.ExpMirror, 4),
+})
+{
+    Console.WriteLine($"\nwrite test - {label} at 0x{where:X8}:");
+    var before = target.ReadMemory(where, size);
+    Console.WriteLine($"  before   {Convert.ToHexString(before)}");
+    var pattern = Convert.FromHexString("DEADBEEFCAFEBABE")[..size];
+    try
+    {
+        target.WriteMemory(where, pattern);
+        var readback = target.ReadMemory(where, size);
+        Console.WriteLine($"  readback {Convert.ToHexString(readback)}");
+        Console.WriteLine($"  {(readback.AsSpan().SequenceEqual(pattern) ? "MATCH - writes work here" : "MISMATCH")}");
+        target.WriteMemory(where, before);
+        Console.WriteLine($"  restored {Convert.ToHexString(target.ReadMemory(where, size))}");
+    }
+    catch (Ps3Exception ex)
+    {
+        Console.WriteLine($"  WRITE REFUSED: {ex.Message}");
+    }
+}
 return 0;
