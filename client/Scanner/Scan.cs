@@ -129,6 +129,26 @@ public static class Compare
         }
         return hits;
     }
+    
+    public static List<Hit> EventOnly(Snapshot idleA, Snapshot idleB, Snapshot after, Width w)
+    {
+        var size = w.Size();
+        var limit = Math.Min(Math.Min(idleA.Data.Length, idleB.Data.Length), after.Data.Length);
+        var hits = new List<Hit>();
+
+        for (var off = 0; off + size <= limit; off += size)
+        {
+            var a = idleA.Read(w, off);
+            var b = idleB.Read(w, off);
+            var c = after.Read(w, off);
+            if (!w.Plausible(a) || !w.Plausible(b) || !w.Plausible(c)) continue;
+
+            if (a != b) continue;      // churns on its own
+            if (b == c) continue;      // the event did not touch it
+            hits.Add(new Hit(idleB.Base + (uint)off, b, c));
+        }
+        return hits;
+    }
 
     public readonly record struct SlotPair(uint First, uint Second, double Value);
 

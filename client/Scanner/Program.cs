@@ -26,6 +26,7 @@ try
         "delta" => Delta(Positional(0)!, Positional(1)!, double.Parse(Positional(2)!)),
         "filter" => Filter(Positional(0)!, Positional(1)!, Positional(2)!),
         "slots" => Slots(Positional(0)!, Positional(1)!, Positional(2)!),
+        "event" => Event(Positional(0)!, Positional(1)!, Positional(2)!),
         "list" => List(),
         _ => Unknown(),
     };
@@ -150,6 +151,21 @@ int Filter(string a, string b, string mode)
     return 0;
 }
 
+int Event(string idleA, string idleB, string after)
+{
+    var (a, b, c) = (Snapshot.Load(SnapPath(idleA)), Snapshot.Load(SnapPath(idleB)), Snapshot.Load(SnapPath(after)));
+    foreach (var w in widths)
+    {
+        var noisy = Compare.Filter(a, b, w, Compare.Change.Changed).Count;
+        var hits = Compare.EventOnly(a, b, c, w);
+        Console.WriteLine($"  {w,-4}: {hits.Count} changed by the event  ({noisy} noisy addresses excluded)");
+        foreach (var h in hits.Take(limit))
+            Console.WriteLine($"      0x{h.Address:X8}  {h.Before} -> {h.After}");
+        if (hits.Count > limit) Console.WriteLine($"      ... and {hits.Count - limit} more");
+    }
+    return 0;
+}
+
 int Slots(string a, string b, string c)
 {
     var (s1, s2, s3) = (Snapshot.Load(SnapPath(a)), Snapshot.Load(SnapPath(b)), Snapshot.Load(SnapPath(c)));
@@ -193,6 +209,9 @@ void Usage() => Console.WriteLine($"""
       delta <a> <b> <value>       values that changed by exactly this
       filter <a> <b> <mode>       changed | unchanged | increased | decreased
       slots <a> <b> <c>           slot-array fill pattern across three snaps
+      event <idleA> <idleB> <after>
+                                  what an event changed, with ambient churn
+                                  subtracted using two idle snapshots
 
     options:
       --rpcs3                     read a running RPCS3 instead of the console
