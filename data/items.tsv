@@ -1,0 +1,1126 @@
+2	Money (1,000 Yen)
+3	Recovery Medicine 1
+4	Recovery Medicine 2
+5	Recovery Medicine 3
+6	Toughness Z
+7	Toughness ZZ
+8	Toughness Emperor
+9	Toughness Infinity
+10	Adhesive Bandages
+11	Tauriner
+12	Tauriner +
+13	Tauriner ++
+14	Tauriner Maximum
+15	Staminan X
+16	Staminan XX
+17	Staminan Royale
+18	Staminan Spark
+19	Haruka's Candy
+20	Haruka's Chocolate
+21	Haruka's Lunch
+22	Haruka's First-Aid Kit
+23	Temp Item 001
+24	Temp Item 002
+25	Shotgun Ammo
+26	Shotgun Ammo
+27	Gatling Gun Ammo
+28	Gatling Gun Ammo
+29	Submachine Gun Ammo
+30	Submachine Gun Ammo
+31	Rifle Ammo
+32	Rifle Ammo
+33	Anti-Materiel Ammo
+34	Anti-Materiel Ammo
+35	Grenade Launcher Ammo
+36	Grenade Launcher Ammo
+37	Platinum Plate
+38	Gold Plate
+39	Silver Plate
+40	Bronze Plate
+41	Iron Plate
+42	Fake Silver Plate
+43	Modern Mahjong Cup Trophy
+44	1000G Coin
+45	100G Coin
+46	10G Coin
+47	Money (50,000 yen)
+48	Pocket Tissues
+49	Oden Soup
+50	Seaweed Rice Ball
+51	Tuna Rice Ball
+52	Salmon Rice Ball
+53	Bento Lunch Set
+54	Bento Lunch Set (Pork)
+55	Club Sandwich
+56	Tuna & Egg Sandwich
+57	Special Yakisoba
+58	Steamed Bun
+59	Bean Paste Bun
+60	Yakisoba Bun
+61	Sake
+62	Milk
+63	Dog Food
+64	Sushi Set
+65	Wormwood
+66	Catnip Stick
+67	Miso Paste Cucumber
+68	Temp Item 582
+69	Legendary Drinker of Ryukyu
+70	Boss Rainbow Mountain Blend
+71	Boss Zeitakubito
+72	Black Boss
+73	Suntory Oolong Tea
+74	Suntory Kuro Oolong Tea
+75	Suntory Natural Mineral Water
+76	Iyemon Cha (Green Tea)
+77	Iyemon Cha Koime (Green Tea)
+78	Gomamugi Cha
+79	The Premium Malt's
+80	Kinmugi
+81	Chu-Hi -196?C Zero
+82	Dummy
+83	Dummy
+84	Shrimp & Avocado Spring Rolls
+85	Smile Burger Set
+86	Smile Cheeseburger Set
+87	Teriyaki Smile Burger Set
+88	King Smile Burger Set
+89	Tuna Burger Set
+90	Stewed Burger Set
+91	Smile Shake
+92	Smile Fries
+93	Limited Kamuro Burger
+94	Shoyu Ramen
+95	Miso Ramen
+96	Tonkotsu Ramen
+97	Shio Ramen
+98	Squid Yakisoba
+99	Soup Harusame: Wonton
+100	Soup Harusame: Egg
+101	Soup Harusame: Tan Tan Noodles
+102	Soup Harusame: Chige
+103	Soup Harusame: Seaweed Veggie
+104	Soup Harusame: Chinese Chicken
+105	Soup Harusame: Hot & Sour
+106	Irresistible Tan Tan Noodles
+107	Irresistible Special Tonkotsu
+108	Tan Tan Noodles
+109	Curry Udon Soup
+110	Special Tonkotsu Ramen
+111	Wakame Ramen
+112	Yamazaki 1984
+113	Yamazaki 25 Years Old
+114	Yamazaki 12 Years Old
+115	Hakushu 25 Years Old
+116	Hakushu 12 Years Old
+117	The Macallan 30 Years Old
+118	The Macallan 12 Years Old
+119	Laphroaig 30 Years Old
+120	Laphroaig 10 Years Old
+121	White Bowmore 43 Years Old
+122	Bowmore 12 Years Old
+123	Glenfiddich 30 Years Old
+124	Glenfiddich 12 Years Old
+125	Hibiki 30 Years Old
+126	Hibiki 17 Years Old
+127	Kakubin
+128	Suntory Whisky Old
+129	Ballantine's 30 Years Old
+130	Ballantine's 17 Years Old
+131	Ballantine's Finest
+132	Jack Daniel's
+133	Early Times
+134	Suntory Brandy X.O
+135	Suntory Brandy V.S.O.P
+136	Suntory Brandy V.O
+137	Chabot Napoleon
+138	Courvoisier XO
+139	The Premium Malt's
+140	Carlsberg
+141	Kyogetsu Green
+142	Suntory Kuromaru Shochu
+143	Ryukyu Awamori Tenryugura
+144	Beefeater
+145	Lemon Hart Demerara
+146	Herradura Tequila Silver
+147	Skyy Vodka
+148	Blended Coffee
+149	Blue Mountain
+150	Mocha
+151	Earl Grey Tea
+152	Milk Tea
+153	Tomato Juice
+154	Lemon Tea
+155	Strawberry Parfait
+156	Chocolate Parfait
+157	Green Tea Float
+158	Toast Set
+159	Sandwich Set
+160	Pasta Set
+161	Cake Set
+162	Original Beef Curry Set
+163	Beef-on-Rice
+164	Beef-on-Rice (L)
+165	Pork-on-Rice
+166	Pork-on-Rice (L)
+167	Korean-style vegetables-on-rice
+168	Korean-style vegetables-on-rice (L)
+169	Original Curry & Rice
+170	Original Curry & Rice (L)
+171	Beef-on-rice Curry
+172	Kalbi on-rice with Kimchi
+173	Kalbi on-rice with Kimchi (L)
+174	Barbecued beef set Meal
+175	Korean barbecued beef Kalbi set meal
+176	Demiglace-sauced hamburger set meal with egg
+177	Ginger pork set meal
+178	Tomato Mozzarella Salad
+179	Octopus Carpaccio
+180	Avocado & Shrimp Salad
+181	Spicy Hawaiian Sausage
+182	Burdock Fries
+183	Spicy Potato
+184	Spicy Chorizo Sausages
+185	Garlic Butter Whelks
+186	Pizza Margherita
+187	Gin Buck
+188	Tequila Rickey with Lime
+189	Tequila & Blood Orange
+190	Campari & Soda
+191	Kahlua & Milk
+192	Kaku D High
+193	Mild Kaku D High
+194	Malibu Cola
+195	Yamazaki Highball Whisky in Bronze Glass
+196	Eggplant Bacon Spaghetti
+197	Shrimp & Tomato Spaghetti
+198	Spaghetti with Meat Sauce
+199	Spicy Fish Roe Spaghetti
+200	Rich Egg Carbonara
+201	Grapefruit Juice
+202	Blood Orange Juice
+203	Hot Coffee
+204	American Coffee
+205	Caf? Latte
+206	Cappuccino
+207	Caf? Mocha
+208	Royal Milk Tea
+209	Milk
+210	Cocoa
+211	Vanilla Gelato
+212	Strawberry Gelato
+213	Chocolate Gelato
+214	Azuki Gelato
+215	Caramel Gelato
+216	Coffee Gelato
+217	Double Scoop
+218	Triple Scoop
+219	Organic Soybean Yose Dofu
+220	Fried Chicken
+221	Cheese and Japanese Yam Omelet
+222	Broiled Hokkaido Mackerel
+223	Egg Yolk Beef Meatballs
+224	Organic Vegetable Salad
+225	Iron Skillet Pot Stickers
+226	Assorted Seasonal Sashimi
+227	Fondant Au Chocolat with Vanilla Ice Cream
+228	Tomato Bacon Pizza
+229	Fried Rice with Shark's Fin
+230	The Premium Malt's Draft
+231	Yuzu Honey Sour
+232	Oolong Tea
+233	Kishu Nanko Plum Sour
+234	Shochu Oolong
+235	Umeshu on the Rocks
+236	Grapefruit Apple Vinegar Sour
+237	The Kaku Highball
+238	Moscow Mule
+239	Gin and Tonic
+240	Cassis Orange
+241	Tropical Sunrise
+242	Smile Burger Set
+243	Smile Cheeseburger Set
+244	Teriyaki Smile Burger Set
+245	King Smile Burger Set
+246	Tuna Burger Set
+247	Stewed Burger Set
+248	Smile Shake
+249	Smile Fries
+250	Kyushu Tonkotsu Ramen
+251	Stewed Tonkotsu Ramen
+252	Pork Ramen
+253	Spicy Roe Tonkotsu Ramen
+254	Egg Tonkotsu Ramen
+255	Black Tonkotsu Ramen
+256	Salted Tongue
+257	Grade-A Salted Tongue
+258	Kalbi
+259	Grade-A Kalbi
+260	Sirloin
+261	Grade-A Sirloin
+262	Harami
+263	Grade-A Harami
+264	Liver Sashimi
+265	Horumon-Yaki
+266	Seafood Platter
+267	Kimchi Combo
+268	Stone-Roasted Bibimbap
+269	Spicy Beef Soup
+270	Tamago
+271	Kappamaki
+272	Maguro
+273	Ama-Ebi
+274	Engawa
+275	Tsubugai
+276	Namatako
+277	Kampachi
+278	Kamburi
+279	Hirame
+280	Shima-Aji
+281	Kinmedai
+282	Ikura
+283	Akagai
+284	Otoro
+285	Awabi
+286	Uni
+287	Limited Kamuro Twilight
+288	Limited Chef's Scattered Sushi
+289	Limited Black Ice Cream
+290	Limited Thick Chuck-Eye Steak
+291	Limited Kamuro Burger
+292	Special Set
+293	Dumpling Soup
+294	Black Stew
+295	Mystery Meat
+296	Five-Star Leftovers
+297	Gold Champagne
+298	Black Champagne
+299	Ros? Champagne
+300	White Champagne
+301	Yamazaki 12 Years Old
+302	Tantakatan
+303	Beer
+304	Cassis Orange
+305	Orange Juice
+306	Kyogetsu Green
+307	Zampa White
+308	Drink 11
+309	Drink 12
+310	Drink 13
+311	Drink 14
+312	Drink 15
+313	Fruit Platter
+314	Chicken Basket
+315	Vegetable Sticks
+316	Dried Ray Fin
+317	Chocolate
+318	Pickled Vegetables
+319	Food 6
+320	Food 7
+321	Food 8
+322	Food 9
+323	Food 10
+324	Food 11
+325	Food 12
+326	Food 13
+327	Food 14
+328	Food 15
+329	3 Times
+330	Naimaga
+331	Young Magazine
+332	Dummy
+333	FRIDAY
+334	Naimaga
+335	Dummy t1
+336	Dummy t2
+337	Black Dragon
+338	Black Ace by Drama
+339	Monogrammed Bag
+340	French Cologne
+341	French Perfume
+342	Italian Cologne
+343	Italian Perfume
+344	French Scarf
+345	French Wallet
+346	Italian Scarf
+347	Italian Wallet
+348	French Handbag
+349	Italian Shoulder Bag
+350	Swiss Watch
+351	Asian Digital Watch
+352	Japanese Diver's Watch
+353	French Haute Couture Dress
+354	French Pr?t-?-Porter Dress
+355	Italian Women's Suit
+356	Italian Women's Watch
+357	Italian Necklace
+358	Caviar Skin Bag
+359	Italian Ring
+360	Italian Men's Necklace
+361	British Women's Coat
+362	Long Two-Piece Dress (Wine)
+363	Long Two-Piece Dress (Blue)
+364	Long Two-Piece Dress (Green)
+365	Long Two-Piece Dress (Leopard)
+366	Long Two-Piece (Black Leopard)
+367	Mini Skirt Dress (Pink)
+368	Mini Skirt Dress (Blue)
+369	Mini Skirt Dress (Green)
+370	Mini Skirt Dress (Yellow)
+371	Mini Skirt Dress (Black)
+372	Off Shoulder Dress (Sunflower)
+373	Off Shoulder Dress (Purple)
+374	Off Shoulder Dress (Lapis)
+375	Off Shoulder Dress (Rose)
+376	Off Shoulder Dress (Green)
+377	Ladies' Suit (Black)
+378	Ladies' Suit (Blue)
+379	Ladies' Suit (Beige)
+380	Ladies' Suit (White)
+381	Ladies' Suit (Gray)
+382	Chinese Dress (Black)
+383	Maid Outfit (Black)
+384	Schoolgirl Uniform (Navy Blue)
+385	Tiara
+386	Hair Band
+387	Headdress
+388	Cat Ears
+389	Elegant Necklace
+390	Chain Necklace
+391	Triple Strand Necklace
+392	Gorgeous Watch
+393	Brand Name Watch
+394	Simple Watch
+395	Heart Ring
+396	Cool Ring
+397	Flower Ring
+398	Perfect Game Cup
+399	Chinese Dress (Orange)
+400	Chinese Dress (Purple)
+401	Chinese Dress (Off-White)
+402	Chinese Dress (Emerald)
+403	Maid Outfit (Aqua Blue)
+404	Schoolgirl Uniform (Yellow)
+405	Schoolgirl Uniform (Red)
+406	Schoolgirl Uniform (Gray)
+407	Schoolgirl Uniform (Beige)
+408	Mermaid Gown (Wine)
+409	Long Halter Gown (Wine)
+410	Long Two-Piece Dress (Pink)
+411	Long Two-Piece Dress (White)
+412	One-Piece Dress (Pink)
+413	One-Piece Dress (Blue)
+414	One-Piece Dress (Green)
+415	One-Piece Dress (Yellow)
+416	One-Piece Dress (Purple)
+417	One-Piece Dress (Monotone)
+418	One-Piece Dress (Orange)
+419	One-Shoulder Dress (Black)
+420	One-Shoulder Dress (Red)
+421	One-Shoulder Dress (Green)
+422	One-Shoulder Dress (Pink)
+423	One-Shoulder Dress (White)
+424	One-Shoulder Dress (Blue)
+425	One-Shoulder Dress (Yellow)
+426	Tuna
+427	Gurukun
+428	Abasa
+429	Mibai
+430	Irabucha
+431	Sea Snail
+432	Coral Branch
+433	Umbrella
+434	Marlin
+435	Coelacanth
+436	Squid
+437	Flounder
+438	Sea Bream
+439	Scorpionfish
+440	Thread-Sail Filefish
+441	Prawn
+442	Eel
+443	Goby
+444	Oil Drum
+445	Bag
+446	Ito
+447	Oarfish
+448	Great White Shark
+449	Giant Crab
+450	Octopus
+451	Dummy f1
+452	Horse Mackerel (Bait)
+453	Squid (Bait)
+454	Shrimp (Bait)
+455	Vinegar Squid (Bait)
+456	Worm (Bait)
+457	Manila Clam (Bait)
+458	Corbicula Clam (Bait)
+459	Prawn (Bait)
+460	Lobster (Bait)
+461	Piyo-Chan
+462	Silk Piyo-Chan
+463	Sky Piyo-Chan
+464	Peach Piyo-Chan
+465	Big Piyo-Chan
+466	Puppy (Golden Retriever)
+467	Puppy (Shiba)
+468	Puppy (Chihuahua)
+469	Puppy (French Bulldog)
+470	Big Puppy (Golden Retriever)
+471	Big Puppy (Shiba)
+472	Big Puppy (Chihuahua)
+473	Big Puppy (French Bulldog)
+474	Manjiro
+475	Golden Manjiro
+476	Pure Gold Manjiro
+477	Satchan
+478	Hito-Nyan (Happy)
+479	Hito-Nyan (Normal)
+480	Hito-Nyan (Disappointed)
+481	AiAi
+482	Yummy Bar (Sauce)
+483	Yummy Bar (Spicy Fish Roe)
+484	Yummy Bar (Salami)
+485	Kamurocho Stew
+486	Kamurocho Stew Rice Bowl
+487	Assorted Yakitori
+488	Habaneron G
+489	Rare Parts (6-Piece Set)
+490	Rare Parts (4-Piece Set B)
+491	Rare Parts (4-Piece Set A)
+492	Rare Parts (2-Piece Set)
+493	Rare Parts (3-Piece Set B)
+494	Rare Parts (3-Piece Set A)
+495	Common Parts (6-Piece Set D)
+496	Common Parts (6-Piece Set C)
+497	Common Parts (6-Piece Set B)
+498	Common Parts (6-Piece Set A)
+499	Deluxe Recovery Pack
+500	Dummy 015
+501	Dummy 016
+502	Dummy 017
+503	Dummy 018
+504	Dummy 019
+505	Emergency Supplies 01
+506	Emergency Supplies 02
+507	Emergency Supplies 03
+508	Emergency Supplies 04
+509	Emergency Supplies 05
+510	Emergency Supplies 06
+511	Emergency Supplies 07
+512	Emergency Supplies 08
+513	Apocalypse Fun Pack 01
+514	Apocalypse Fun Pack 02
+515	Apocalypse Fun Pack 03
+516	Apocalypse Fun Pack 04
+517	Apocalypse Fun Pack 05
+518	Apocalypse Fun Pack 06
+519	Apocalypse Fun Pack 07
+520	Apocalypse Fun Pack 08
+521	Plastic Garbage
+522	Cylindrical Garbage
+523	Boxy Garbage
+524	Soft Garbage
+525	Good Metal Garbage
+526	Fair Metal Garbage
+527	Bad Metal Garbage
+528	Good Plastic Garbage
+529	Fair Plastic Garbage
+530	Bad Plastic Garbage
+531	Good Cylindrical Garbage
+532	Fair Cylindrical Garbage
+533	Bad Cylindrical garbage
+534	Good Boxy Garbage
+535	Fair Boxy Garbage
+536	Bad Boxy Garbage
+537	Good Soft Garbage
+538	Fair Soft Garbage
+539	Bad Soft Garbage
+540	Super Hard Aluminum Alloy
+541	Block of Steel
+542	Scrap Iron
+543	Magnetized Metal
+544	Elastic Alloy
+545	Sacred Wood
+546	Maple Wood
+547	Ash Wood
+548	Eye of the Dragon
+549	Seal of the Dragon
+550	Blood of the Dragon
+551	Diamond
+552	Ruby
+553	Pearl
+554	Monkey Boy Helmet
+555	Diptera Necklace
+556	Fattie Fork
+557	Hermit Amulet
+558	Meathead Belt
+559	Cry Baby Barrette
+560	Aggro Medal
+561	Bloody Cloth
+562	Mystery Stone
+563	Demon Stone
+564	Hero's Cartridge
+565	Bull's-Eye Tile
+566	Plasma Battery
+567	Gravity Converter
+568	Modified Motor
+569	Broken Radio
+570	Super Coolant
+571	Mystery Liquid
+572	High-Density Polymer
+573	Super Resilient Resin
+574	SSS Gunpowder
+575	Shard of Bulletproof Glass
+576	Carbon Nanotube Fabric
+577	Large Blow-Up Doll
+578	Sturdy Spring
+579	Rubber Hose
+580	Stuffed Cat Toy
+581	Super Glue
+582	Multipurpose Thumbtack
+583	Kamaitachi Utility Knife
+584	Rubber Ball
+585	Flour
+586	Pepper
+587	Bagged Ice
+588	Blue Fluorescent Bulb
+589	Dropper
+590	Cooking Oil
+591	Fitness Gear
+592	Tonic Shampoo
+593	Patented Hanger
+594	Plastic Bag
+595	Lighter Oil
+596	Battery
+597	Chili Pepper
+598	Iron Nail
+599	All 1's Charm
+600	Even Goro's Beads
+601	Lopsider Cigarette
+602	Black Jewel
+603	Red Jewel
+604	Zero Jewel
+605	Blackjack Amulet
+606	Bust Amulet
+607	1-2-3 Gum
+608	Trips Yokan
+609	Piss Mountain Stone
+610	Gambler's Amulet
+611	Get-Rich-Quick Charm
+612	Chance Stone
+613	Royal Joker Card
+614	Banker's Piece
+615	Player's Piece
+616	Batting Coupon
+617	Pool Coupon
+618	Bowling Coupon
+619	Shogi Coupon
+620	Money Item Icon
+621	Experience Points Item Icon
+622	Point Item Icon
+623	Standard Massage Course
+624	Deluxe Massage Course
+625	VIP Oil Massage Course
+626	Super VIP Massage Course
+627	Cat's Key
+628	Platinum Engagement Rings
+629	Cutie Girl Figure
+630	SR Love Shine Figure
+631	High Payout Token
+632	High Win Rate Token
+633	Auto Token
+634	10,000 Yen
+635	50,000 Yen
+636	3-Piece Rage Set & BB Gun
+637	Satellite Laser
+638	Anti-Tank Missile Launcher
+639	??????????
+640	ARASE SP-R
+641	ARASE SP-R2
+642	ARASE XR
+643	Hunting Shotgun
+644	Custom Shotgun
+645	Guy's Custom Shotgun
+646	New Balalaika
+647	Date Custom
+648	Date Special
+649	Bargain-Bin Automatic Rifle
+650	Repaired Automatic Rifle
+651	Refined Automatic Rifle
+652	Blackhawk
+653	Improved Blackhawk
+654	Ultimate Blackhawk
+655	Lightweight 9mm Automatic
+656	Lightweight Wk-CP11 Gang
+657	Lightweight Wk-CP21 Yakuza
+658	Hanabi
+659	Hanabi
+660	Hanabi
+661	9mm Automatic
+662	Wk-CP11 Gang
+663	Wk-CP21 Yakuza
+664	Golden Pistol
+665	Large Automatic Pistol
+666	Wk-CP35 Tiger
+667	Tiger Pistol
+668	Gangster's Pistol
+669	Macedonian Twins
+670	High & Low
+671	Elise
+672	Hunting Shotgun
+673	Path Maker
+674	Flesh Shredder
+675	Smoking Shotgun
+676	Fireworks Gun
+677	Mark IV EXP
+678	Meat Grinder
+679	MJM56 Crazy Dog
+680	MJM56-55 Exorcist
+681	Portable Gatling Gun Prototype
+682	XMG-RIMBO
+683	Kagutsuchi
+684	Girly Gatling Gun
+685	Love Shine Vulcan
+686	Kuroganemaru
+687	Modified Kuroganemaru
+688	Demon Slayer
+689	Dragon Arm
+690	New Balalaika
+691	Self-Defense Submachine Gun
+692	Hornet
+693	5.56mm Automatic Rifle
+694	YAR-18 Tojo Model
+695	Liberator
+696	SWS2 Sniper Rifle
+697	Sharp Shooter
+698	HSG-GARO
+699	XK.50 Anti-Materiel Rifle
+700	Zombie Masher
+701	Tank Killer
+702	Dragon Rifle
+703	Grenade Launcher
+704	Incendiary Grenade Launcher
+705	Stun Grenade Launcher
+706	Grenades
+707	Heavy Grenades
+708	Molotov Cocktails
+709	Incendiary Grenades
+710	Stun Grenades
+711	Anti-Tank Missile Launcher
+712	Satellite Laser
+713	Standard Automatic Rifle
+714	Bootleg Pistol
+715	Paper Fan
+716	Pursuit Handgun
+717	BB Gun
+718	Handgun
+719	Modified Handgun
+720	Handgun DX
+721	Dual Handguns
+722	Modified Dual Handguns
+723	Dual Handguns DX
+724	Shotgun
+725	Modified Shotgun
+726	Fireworks Shotgun
+727	Assault Rifle
+728	Modified Assault Rifle
+729	Assault Rifle DX
+730	Grenade Launcher
+731	Modified Grenade Launcher
+732	Grenade Launcher DX
+733	Anti-Tank Missile Launcher
+734	Grenades
+735	Temp Weapon 02
+736	Temp Weapon 03
+737	Temp Weapon 04
+738	Temp Weapon 05
+739	Temp Weapon 06
+740	Temp Weapon 07
+741	Temp Weapon 08
+742	Temp Weapon 09
+743	Temp Weapon 10
+744	Temp Weapon 11
+745	Temp Weapon 12
+746	Temp Weapon 13
+747	Temp Weapon 14
+748	Temp Weapon 15
+749	Temp Weapon 16
+750	Temp Weapon 17
+751	Temp Weapon 18
+752	Temp Weapon 19
+753	Temp Weapon 20
+754	Temp Weapon 21
+755	Temp Weapon 22
+756	Temp Weapon 23
+757	Temp Weapon 24
+758	Temp Weapon 25
+759	Temp Weapon 26
+760	Temp Weapon 27
+761	Temp Weapon 28
+762	Temp Weapon 29
+763	Temp Weapon 30
+764	End of weapons
+765	????????????
+766	Binding
+767	Improved Binding
+768	Ultimate Binding
+769	Fighter's Binding
+770	Badass Binding
+771	Improved Badass Binding
+772	Ultimate Badass Binding
+773	Outlaw Binding
+774	Improved Outlaw Binding
+775	Ultimate Outlaw Binding
+776	Heroic Binding
+777	Bloody Binding
+778	Lucky Binding
+779	Chain Mail
+780	Battle Mail
+781	Steel Mail
+782	Antique Chain Mail
+783	Dragon Mail
+784	Light Breastplate
+785	Improved Light Breastplate
+786	Ultimate Light Breastplate
+787	Bulletproof Breastplate
+788	SWAT Body Armor
+789	Improved SWAT Body Armor
+790	Ultimate SWAT Body Armor
+791	Flak Vest
+792	Improved Flak Vest
+793	Ultimate Flak Vest
+794	Optical Camouflage Suit
+795	Dragon Flak Vest
+796	Dragon Shirt
+797	Fitness Gear
+798	Improved Fitness Gear
+799	Ultimate Fitness Gear
+800	Training Gear
+801	Improved Training Gear
+802	Ultimate Training Gear
+803	Power Vest
+804	Improved Power Vest
+805	Ultimate Power Vest
+806	Survivor Training Gear
+807	Rapid-Fire Training Gear
+808	Yakuza Training Gear
+809	Rage Armor
+810	Physimagic Jersey
+811	Sprinter's Shirt
+812	Sunshine Belly Warmer
+813	Temp Armor 01
+814	Temp Armor 02
+815	Temp Armor 03
+816	Temp Armor 04
+817	Temp Armor 05
+818	Temp Armor 06
+819	Temp Armor 07
+820	Temp Armor 08
+821	Temp Armor 09
+822	Temp Armor 10
+823	Temp Armor 11
+824	Temp Armor 12
+825	End of armor
+826	Start of accessories
+827	Gauntlets
+828	Protective Amulet
+829	Rookie's Amulet
+830	Berserker Charm
+831	Rage Talisman
+832	Waste-Not Want-Not Charm
+833	Haruka's Amulet
+834	Bull's-Eye Amulet
+835	Sugar Daddy Amulet
+836	Gourmet Badge
+837	Haruka's Necklace
+838	Money-Making Beads
+839	Sunshine Scarf
+840	Power Stone Bracelet
+841	Hit Man's Ring
+842	Rage Bracelet
+843	Street Fighter's Bracelet
+844	Tiger Skin Belt
+845	Plastic Shin Guards
+846	Comfy Soles
+847	Steel Shin Guards
+848	Mew Shoes
+849	Contact Lenses
+850	Zero-In Lenses
+851	Sacrifice Stone
+852	Lady Killer Bracelet
+853	Lucky Bracelet
+854	Charisma Ring
+855	Haruka's Amulet
+856	Ebisu Socks
+857	Shoulder Pads
+858	Gion Bell
+859	Gourmet Bracelet
+860	Temp Accessory 02
+861	Temp Accessory 03
+862	Temp Accessory 04
+863	Temp Accessory 05
+864	Temp Accessory 06
+865	Temp Accessory 07
+866	Temp Accessory 08
+867	Temp Accessory 09
+868	Temp Accessory 10
+869	Temp Accessory 11
+870	Temp Accessory 12
+871	Temp Accessory 13
+872	Temp Accessory 14
+873	Temp Accessory 15
+874	Temp Accessory 16
+875	Temp Accessory 17
+876	End of accessories
+877	SITEM
+878	Locker Key: Taihei Blvd.
+879	Locker Key: Underground Mall
+880	Wooden Tags
+881	Mahjong Sticks
+882	Casino Chips
+883	Pachinko Balls
+884	Slot Tokens
+885	Ecopoints
+886	Akiyama's Cell Phone
+887	Saejima's Cell Phone
+888	Tanimura's Cell Phone
+889	Kiryu's Cell Phone
+890	Briefcase
+891	Nishida's Notebook
+892	Event Hall Key
+893	Client Register
+894	Key to New Serena
+895	Section Key
+896	Manhole Opener
+897	Card Key
+898	Tokyo Sports Special Edition 1
+899	Tokyo Sports Special Edition 2
+900	Yakuza Heroes Past & Present
+901	Battlefield Adventures
+902	Zombie Armageddon
+903	An Assassin's Anguish
+904	Limbo 3: A Hardcore Core!
+905	Assault: Love Shine, the Movie
+906	Fight Like a Pyrotechnician
+907	The Footwear Files
+908	Eye Contact: The First Punch
+909	Kamurocho: Fact and Fiction
+910	Sarge's Unexpected Gift
+911	The Secret Tojo Clan Fortune
+912	From Yakuza to Avenger
+913	Happiness Is a Smoking Gun
+914	Wrestling a Rampaging River
+915	Airstrike: A Pilot's Tale
+916	Yakuza vs. Aliens
+917	Crude LED Light
+918	Ordinary LED Light
+919	High-Efficiency LED Light
+920	Torn Diary 1
+921	Torn Diary 2
+922	Fax
+923	Trophy
+924	Love in Heart Point Card
+925	Love in Heart Point Card
+926	Love in Heart Point Card
+927	Love in Heart Point Card
+928	Letter from Komaki
+929	Pin-Up Poster No. 1
+930	Pin-Up Poster No. 2
+931	Pin-Up Poster No. 3
+932	Pin-Up Poster No. 4
+933	Pin-Up Poster No. 5
+934	Pin-Up Poster No. 6
+935	Pin-Up Poster No. 7
+936	Darts Live Membership Card
+937	Darts Live Membership Card
+938	Darts Live Membership Card
+939	Darts Live Membership Card
+940	Darts Live Membership Card
+941	Darts Live Membership Card
+942	Darts Live Membership Card
+943	Darts Live Membership Card
+944	Darts Live Membership Card
+945	Darts Live Membership Card
+946	Darts Live Membership Card
+947	Rio's Business Card
+948	Rio's Fancy Business Card
+949	Shizuka's Business Card
+950	Shizuka's Fancy Business Card
+951	Himeka's Business Card
+952	Himeka's Fancy Business Card
+953	Maya's Business Card
+954	Maya's Fancy Business Card
+955	Noa's Business Card
+956	Noa's Fancy Business Card
+957	Erena's Business Card
+958	Erena's Fancy Business Card
+959	Chihiro's Business Card
+960	Chihiro's Fancy Business Card
+961	%s's Business Card
+962	%s's Fancy Business Card
+963	%s's Business Card
+964	%s's Fancy Business Card
+965	%s's Business Card
+966	%s's Fancy Business Card
+967	Kiryu's Cell Phone
+968	Fishing Champ
+969	Red Shark
+970	Blue Fox
+971	Gold Hawk
+972	Titanium Core Balls
+973	"Extra Hard Mode" Letter
+974	"Ultimate Skill" Letter
+975	"Saejima Substories" Letter
+976	"Amon Battle" Letter
+977	"Lockers" Letter
+978	"Dining" Letter
+979	"Modding" Letter
+980	"Revelations" Letter
+981	"Minigames" Letter
+982	"Master's Helper" Letter
+983	"Coliseum" Letter
+984	"Fighter Maker" Letter
+985	"Gang Encounters" Letter
+986	"IF7-R" Letter
+987	"HEAT Action" Letter
+988	From 777 Town
+989	From 777 Town
+990	Completion Mail Buffer 01
+991	Completion Mail Buffer 02
+992	Completion Mail Buffer 03
+993	Completion Mail Buffer 04
+994	Completion Mail Buffer 05
+995	Completion Mail Buffer 06
+996	Darts Live Membership Card
+997	Darts Live Membership Card
+998	Darts Live Membership Card
+999	Darts Live Membership Card
+1000	Darts Live Membership Card
+1001	Darts Live Membership Card
+1002	Darts Live Membership Card
+1003	Darts Live Membership Card
+1004	Darts Live Membership Card
+1005	Darts Live Membership Card
+1006	Darts Live Membership Card
+1007	Darts Live Membership Card
+1008	Darts Live Membership Card
+1009	Darts Live Membership Card
+1010	Darts Live Membership Card
+1011	Darts Live Membership Card
+1012	Darts Live Membership Card
+1013	Darts Live Membership Card
+1014	Darts Live Membership Card
+1015	Darts Live Membership Card
+1016	Darts Live Membership Card
+1017	Darts Live Membership Card
+1018	Darts Live Membership Card
+1019	Darts Live Membership Card
+1020	Darts Live Membership Card
+1021	Darts Live Membership Card
+1022	Darts Live Membership Card
+1023	Darts Live Membership Card
+1024	Darts Live Membership Card
+1025	Darts Live Membership Card
+1026	Darts Live Membership Card
+1027	Darts Live Membership Card
+1028	Darts Live Membership Card
+1029	Key to Kamurocho Hills
+1030	Ancient Sword
+1031	Ancient Cup
+1032	Ancient Mirror
+1033	Ancient Bead
+1034	Forklift Key
+1035	Letter to Majima
+1036	Letter to Goda
+1037	Serum
+1038	Lucky Mahjong Marker
+1039	Fever Medicine
+1040	Envelope from Hanaoka
+1041	Envelope from Juri
+1042	Envelope from Kazami
+1043	Envelope from Tsukimura
+1044	Note from Junya
+1045	Special Order
+1046	Yuna's Business Card
+1047	Yuna's Fancy Business Card
+1048	Erika's Business Card
+1049	Erika's Fancy Business Card
+1050	Saaya's Business Card
+1051	Saaya's Fancy Business Card
+1052	Hina's Business Card
+1053	Hina's Fancy Business Card
+1054	Ai's Business Card
+1055	Ai's Fancy Business Card
+1056	Miyabi's Business Card
+1057	Miyabi's Fancy Business Card
+1058	Yuria's Business Card
+1059	Yuria's Fancy Business Card
+1060	Important Dummy 183
+1061	Important Dummy 184
+1062	Important Dummy 185
+1063	Important Dummy 186
+1064	Important Dummy 187
+1065	Important Dummy 188
+1066	Important Dummy 189
+1067	Important Dummy 190
+1068	Important Dummy 191
+1069	Important Dummy 192
+1070	Important Dummy 193
+1071	Important Dummy 194
+1072	Important Dummy 195
+1073	Important Dummy 196
+1074	Important Dummy 197
+1075	Important Dummy 198
+1076	Important Dummy 199
+1077	Important Dummy 200
+1078	Important Dummy 201
+1079	Important Dummy 202
+1080	Important Dummy 203
+1081	Important Dummy 204
+1082	Important Dummy 205
+1083	Important Dummy 206
+1084	Important Dummy 207
+1085	Important Dummy 208
+1086	Important Dummy 209
+1087	Important Dummy 210
+1088	Important Dummy 211
+1089	Important Dummy 212
+1090	Important Dummy 213
+1091	Important Dummy 214
+1092	Important Dummy 215
+1093	Important Dummy 216
+1094	Important Dummy 217
+1095	Important Dummy 218
+1096	Important Dummy 219
+1097	Important Dummy 220
+1098	Important Dummy 221
+1099	Important Dummy 222
+1100	Important Dummy 223
+1101	Important Dummy 224
+1102	Important Dummy 225
+1103	Important Dummy 226
+1104	Important Dummy 227
+1105	Important Dummy 228
+1106	Important Dummy 229
+1107	Important Dummy 230
+1108	Important Dummy 231
+1109	Important Dummy 232
+1110	Important Dummy 233
+1111	Important Dummy 234
+1112	Important Dummy 235
+1113	Important Dummy 236
+1114	Important Dummy 237
+1115	Important Dummy 238
+1116	Important Dummy 239
+1117	Important Dummy 240
+1118	Important Dummy 241
+1119	Important Dummy 242
+1120	Important Dummy 243
+1121	Important Dummy 244
+1122	Important Dummy 245
+1123	Important Dummy 246
+1124	Important Dummy 247
+1125	Important Dummy 248
+1126	Important Dummy 249
+1127	Important Dummy 250

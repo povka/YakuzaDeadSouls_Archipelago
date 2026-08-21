@@ -54,24 +54,58 @@ public static class Inventory
         public bool IsItem => !IsEmpty && !IsLocked;
     }
 
-    // Inferred from a shop run, assuming slots fill in purchase order.
-    public static readonly IReadOnlyDictionary<ushort, string> KnownItems =
-        new Dictionary<ushort, string>
+    // Names come from data/items.tsv, dumped from the game's own name table
+    // in memory. Ids 2-1127; the game marks its own category boundaries.
+    public const ushort FirstId = 2;
+    public const ushort LastId = 1127;
+    public const ushort EndOfWeapons = 764;
+    public const ushort EndOfArmor = 825;
+    public const ushort StartOfAccessories = 826;
+    public const ushort EndOfAccessories = 876;
+
+    private static IReadOnlyDictionary<ushort, string>? _names;
+
+    public static IReadOnlyDictionary<ushort, string> KnownItems => _names ??= LoadNames();
+
+    private static Dictionary<ushort, string> LoadNames()
+    {
+        var names = new Dictionary<ushort, string>();
+        var path = FindDataFile("items.tsv");
+        if (path is null) return names;
+
+        foreach (var line in File.ReadLines(path))
         {
-            [11] = "Tauriner",
-            [12] = "Tauriner+",
-            [49] = "Oden Soup",
-            [50] = "Seaweed Rice Ball",
-            [51] = "Tuna Rice Ball",
-            [52] = "Salmon Rice Ball",
-            [53] = "Bento Lunch Set",
-            [55] = "Club Sandwich",
-            [56] = "Tuna & Egg Sandwich",
-            [57] = "Special Yakisoba",
-            [58] = "Steamed Bun",
-            [59] = "Bean Paste Bun",
-            [61] = "Sake",
-        };
+            var tab = line.IndexOf('	');
+            if (tab <= 0) continue;
+            if (ushort.TryParse(line[..tab], out var id))
+                names[id] = line[(tab + 1)..];
+        }
+        return names;
+    }
+
+    private static string? FindDataFile(string name)
+    {
+        var dir = AppContext.BaseDirectory;
+        for (var i = 0; i < 7 && dir is not null; i++)
+        {
+            var candidate = Path.Combine(dir, "data", name);
+            if (File.Exists(candidate)) return candidate;
+            dir = Path.GetDirectoryName(dir.TrimEnd(Path.DirectorySeparatorChar));
+        }
+        return null;
+    }
+
+    // The table is padded with placeholders the game never uses. Keep them out
+    // of any randomizer item pool.
+    public static bool IsPlaceholder(string name) =>
+        name.StartsWith("Dummy", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Temp ", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Important Dummy", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("End of", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Start of", StringComparison.OrdinalIgnoreCase);
+
+    public static IEnumerable<KeyValuePair<ushort, string>> RealItems =>
+        KnownItems.Where(kv => !IsPlaceholder(kv.Value));
 
     public static byte[] MakeRecord(ushort itemId, uint quantity = 1)
     {

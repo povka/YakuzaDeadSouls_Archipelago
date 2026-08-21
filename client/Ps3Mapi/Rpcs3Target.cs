@@ -123,6 +123,30 @@ public sealed partial class Rpcs3Target : IMemoryTarget, IDisposable
         }
     }
 
+    public IEnumerable<(uint Guest, ulong Size, uint Protect)> MappedGuestRegions()
+    {
+        var address = (IntPtr)GuestBase;
+        var limit = GuestBase + 0x100000000UL;
+        var size = (IntPtr)Marshal.SizeOf<MemoryBasicInformation>();
+
+        while ((ulong)address < limit &&
+               VirtualQueryEx(_handle, address, out var info, size) != IntPtr.Zero)
+        {
+            var regionSize = (ulong)info.RegionSize;
+            if (regionSize == 0) break;
+
+            var readable = info.State == MemCommit
+                           && (info.Protect & PageNoAccess) == 0
+                           && (info.Protect & PageGuard) == 0;
+            if (readable)
+                yield return ((uint)((ulong)info.BaseAddress - GuestBase), regionSize, info.Protect);
+
+            var next = (ulong)info.BaseAddress + regionSize;
+            if (next > long.MaxValue) break;
+            address = (IntPtr)next;
+        }
+    }
+
     public byte[] ReadMemory(uint address, int size)
     {
         var buffer = new byte[size];

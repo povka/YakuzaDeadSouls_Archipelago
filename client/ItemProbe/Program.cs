@@ -52,6 +52,43 @@ switch (command)
     case "fill": Fill(ParseIds(rest.FirstOrDefault(a => !a.StartsWith("--")) ?? "")); break;
     case "next": Fill(NextUnknownIds(Inventory.Slots)); break;
     case "restore": Restore(); Read(); break;
+    case "regions":
+        if (target is Rpcs3Target r0)
+        {
+            Console.WriteLine("mapped guest regions:");
+            ulong totalBytes = 0;
+            foreach (var (guest, len, prot) in r0.MappedGuestRegions())
+            {
+                Console.WriteLine($"  0x{guest:X8} - 0x{guest + (uint)len:X8}  {len / 1024.0 / 1024,8:F2} MB  prot=0x{prot:X}");
+                totalBytes += len;
+            }
+            Console.WriteLine($"  total {totalBytes / 1024.0 / 1024:F1} MB readable");
+        }
+        else Console.WriteLine("regions needs --rpcs3");
+        break;
+    case "find":
+        if (target is Rpcs3Target r1)
+            YakuzaDeadSouls.ItemProbe.FindStrings.Run(r1, rest.FirstOrDefault(a => !a.StartsWith("--")) ?? "Tauriner");
+        else Console.WriteLine("find needs --rpcs3 (a full RAM sweep over PS3MAPI would take hours)");
+        break;
+    case "strings":
+        if (target is Rpcs3Target r2)
+            YakuzaDeadSouls.ItemProbe.FindStrings.DumpTable(r2,
+                Convert.ToUInt32(rest.First(a => !a.StartsWith("--")), 16), 60);
+        else Console.WriteLine("strings needs --rpcs3");
+        break;
+    case "ids":
+        if (target is Rpcs3Target r3)
+        {
+            var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+            YakuzaDeadSouls.ItemProbe.FindStrings.DumpIds(r3,
+                Convert.ToUInt32(bare[0], 16),
+                bare.Length > 1 ? ushort.Parse(bare[1]) : (ushort)2,
+                bare.Length > 2 ? int.Parse(bare[2]) : 400,
+                Array.IndexOf(rest, "--code") >= 0);
+        }
+        else Console.WriteLine("ids needs --rpcs3");
+        break;
     default: Usage(); break;
 }
 return 0;
