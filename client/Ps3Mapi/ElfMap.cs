@@ -2,16 +2,8 @@ using System.Buffers.Binary;
 
 namespace YakuzaDeadSouls.Ps3;
 
-/// <summary>
-/// Reads the running game's segment layout from its own ELF program headers.
-/// </summary>
-/// <remarks>
-/// The EBOOT is mapped with its ELF header at 0x00010000, so the layout can be
-/// read straight out of the live process - no dump, no decryption, no Ghidra.
-/// That gives the two ranges everything else needs: where code lives (the
-/// search space for function addresses) and where writable data lives (where
-/// game state is, and what to point a scanner at).
-/// </remarks>
+// The EBOOT is mapped with its ELF header at 0x00010000, so the segment
+// layout can be read straight out of the live process.
 public static class ElfMap
 {
     public readonly record struct Segment(
@@ -33,7 +25,6 @@ public static class ElfMap
             s => s.IsLoad && s.Writable && !s.Executable && s.MemorySize > 0);
     }
 
-    /// <summary>Read and decode the program headers. Throws if the ELF magic is absent.</summary>
     public static Layout Read(GameProcess game)
     {
         var header = game.Read(Addresses.EbootBase, 64);
@@ -41,9 +32,8 @@ public static class ElfMap
             throw new Ps3Exception(
                 $"no ELF magic at {Addresses.EbootBase:X8} - got {Convert.ToHexString(header[..8])}");
 
-        // ELF64 big-endian: e_entry at 24, e_phoff at 32, e_phentsize at 54, e_phnum at 56.
-        // Note the entry points at a function descriptor in the data segment,
-        // not at code - normal for the PPC64 ELFv1 ABI, not a misread.
+        // ELF64 big-endian. Entry points at a function descriptor in the data
+        // segment, not at code - normal for the PPC64 ELFv1 ABI.
         var entry = (uint)BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(24, 8));
         var phoff = BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(32, 8));
         var phentsize = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(54, 2));

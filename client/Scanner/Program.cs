@@ -2,43 +2,33 @@ using System.Diagnostics;
 using YakuzaDeadSouls.Ps3;
 using YakuzaDeadSouls.Scanner;
 
-// ydsscan <host> <command> [options]
-//
-//   snap <name>                    sweep the data segment and save it
-//   eq <name> <value>              addresses equal to a value in a snapshot
-//   delta <a> <b> <value>          values that changed by exactly this
-//   filter <a> <b> <mode>          changed | unchanged | increased | decreased
-//   slots <a> <b> <c>              slot-array fill pattern across three snaps
-//
-// Options: --width u8|u16|u32|f32 (default u32), --all (every width), --limit N
+if (args.Length < 1) { Usage(); return 1; }
 
-if (args.Length < 2) { Usage(); return 1; }
-var host = args[0];
-var command = args[1].ToLowerInvariant();
-var rest = args[2..];
+var command = args[0].ToLowerInvariant();
+var rest = args[1..];
 
 var widthArg = Opt("--width");
 var allWidths = Flag("--all");
-var limit = int.TryParse(Opt("--limit"), out var l) ? l : 20;
+var limit = int.TryParse(Opt("--limit"), out var parsed) ? parsed : 20;
 var widths = allWidths
     ? new[] { Width.U8, Width.U16, Width.U32, Width.F32 }
     : [widthArg is null ? Width.U32 : Widths.Parse(widthArg)];
 
-var outDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "output");
-outDir = Path.GetFullPath(outDir);
+var outDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "output"));
 string SnapPath(string name) => Path.Combine(outDir, $"snap_{name}.bin");
 
 try
 {
-    switch (command)
+    return command switch
     {
-        case "snap": return await Snap(Positional(0) ?? "default");
-        case "eq": return Equals(Positional(0)!, double.Parse(Positional(1)!));
-        case "delta": return Delta(Positional(0)!, Positional(1)!, double.Parse(Positional(2)!));
-        case "filter": return Filter(Positional(0)!, Positional(1)!, Positional(2)!);
-        case "slots": return Slots(Positional(0)!, Positional(1)!, Positional(2)!);
-        default: Usage(); return 1;
-    }
+        "snap" => await Snap(Positional(0) ?? "default"),
+        "eq" => Equal(Positional(0)!, double.Parse(Positional(1)!)),
+        "delta" => Delta(Positional(0)!, Positional(1)!, double.Parse(Positional(2)!)),
+        "filter" => Filter(Positional(0)!, Positional(1)!, Positional(2)!),
+        "slots" => Slots(Positional(0)!, Positional(1)!, Positional(2)!),
+        "list" => List(),
+        _ => Unknown(),
+    };
 }
 catch (Exception ex)
 {
@@ -46,8 +36,11 @@ catch (Exception ex)
     return 1;
 }
 
+int Unknown() { Usage(); return 1; }
+
 async Task<int> Snap(string name)
 {
+    var host = Ps3Config.Require(Opt("--host"));
     var pid = await Ps3Console.FindGameAsync(host);
     if (pid is null) { Console.WriteLine("No game running."); return 1; }
 
@@ -79,7 +72,19 @@ async Task<int> Snap(string name)
     return 0;
 }
 
-int Equals(string name, double value)
+int List()
+{
+    if (!Directory.Exists(outDir)) { Console.WriteLine("no snapshots yet"); return 0; }
+    foreach (var f in Directory.GetFiles(outDir, "snap_*.bin").OrderBy(f => f))
+    {
+        var info = new FileInfo(f);
+        var name = Path.GetFileNameWithoutExtension(f)["snap_".Length..];
+        Console.WriteLine($"  {name,-24} {info.Length / 1024.0 / 1024:F1} MB   {info.LastWriteTime:g}");
+    }
+    return 0;
+}
+
+int Equal(string name, double value)
 {
     var snap = Snapshot.Load(SnapPath(name));
     foreach (var w in widths)
@@ -155,23 +160,24 @@ string? Positional(int index)
     return null;
 }
 
-void Usage()
-{
-    Console.WriteLine("""
-        ydsscan <host> <command> [options]
+void Usage() => Console.WriteLine($"""
+    ydsscan <command> [args] [options]
 
-          snap <name>                 sweep the data segment and save it
-          eq <snap> <value>           addresses holding a value
-          delta <a> <b> <value>       values that changed by exactly this
-          filter <a> <b> <mode>       changed | unchanged | increased | decreased
-          slots <a> <b> <c>           slot-array fill pattern across three snaps
+      snap <name>                 sweep the data segment and save it
+      list                        show saved snapshots
+      eq <snap> <value>           addresses holding a value
+      delta <a> <b> <value>       values that changed by exactly this
+      filter <a> <b> <mode>       changed | unchanged | increased | decreased
+      slots <a> <b> <c>           slot-array fill pattern across three snaps
 
-        options:
-          --width u8|u16|u32|f32      default u32
-          --all                       run every width
-          --limit N                   max hits to print (default 20)
+    options:
+      --host <ip>                 console address (only 'snap' needs it)
+      --width u8|u16|u32|f32      default u32
+      --all                       run every width
+      --limit N                   max hits to print (default 20)
 
-        For a value with no number on screen (a health bar), snapshot either
-        side of a change and use 'filter' or 'delta' with --all.
-        """);
-}
+    Only 'snap' talks to the console; everything else works offline on saved
+    snapshots, so one capture can be reinterpreted at any width.
+
+    {Ps3Config.HelpText}
+    """);

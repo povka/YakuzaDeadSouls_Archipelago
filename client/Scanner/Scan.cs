@@ -13,7 +13,7 @@ public static class Widths
         _ => 4,
     };
 
-    /// <summary>Read a value as a double so every width shares one comparison path.</summary>
+    // Everything reads as double so one comparison path serves all widths.
     public static double Read(this Width w, ReadOnlySpan<byte> data, int offset) => w switch
     {
         Width.U8 => data[offset],
@@ -22,10 +22,7 @@ public static class Widths
         _ => BinaryPrimitives.ReadSingleBigEndian(data.Slice(offset, 4)),
     };
 
-    /// <summary>
-    /// Most of a data segment reinterpreted as float is noise. Reject NaN,
-    /// infinities and absurd magnitudes so float scans stay usable.
-    /// </summary>
+    // Most of a data segment reinterpreted as float is noise.
     public static bool Plausible(this Width w, double v) =>
         w != Width.F32 || (!double.IsNaN(v) && !double.IsInfinity(v) && Math.Abs(v) < 1e9);
 
@@ -39,7 +36,6 @@ public static class Widths
     };
 }
 
-/// <summary>One full sweep of a memory region, held for offline comparison.</summary>
 public sealed class Snapshot(uint baseAddress, byte[] data)
 {
     public uint Base { get; } = baseAddress;
@@ -67,15 +63,8 @@ public sealed class Snapshot(uint baseAddress, byte[] data)
 
 public readonly record struct Hit(uint Address, double Before, double After);
 
-/// <summary>
-/// Comparisons over snapshots. Everything works offline on captured bytes, so
-/// one capture can be reinterpreted at every width - which matters because the
-/// width of an unknown value is usually a guess, and guessing wrong otherwise
-/// wastes a whole capture cycle.
-/// </summary>
 public static class Compare
 {
-    /// <summary>Values equal to a target in one snapshot.</summary>
     public static List<uint> Equals(Snapshot snap, Width w, double target)
     {
         var size = w.Size();
@@ -86,7 +75,6 @@ public static class Compare
         return hits;
     }
 
-    /// <summary>Narrow an existing candidate set to those now equal to a target.</summary>
     public static List<uint> Equals(Snapshot snap, Width w, double target, IEnumerable<uint> candidates)
     {
         var size = w.Size();
@@ -124,16 +112,8 @@ public static class Compare
         return hits;
     }
 
-    /// <summary>
-    /// Values that changed by exactly <paramref name="delta"/>.
-    /// </summary>
-    /// <remarks>
-    /// The most useful search in this project. EXP is stored counting up while
-    /// the UI shows "N to next level" as threshold - exp, so scanning for the
-    /// displayed 150 -> 100 returned zero hits at every width. Searching for a
-    /// delta of +50 found it immediately. Anything shown as a countdown, a
-    /// percentage or a bar needs this rather than a value search.
-    /// </remarks>
+    // For values shown as a countdown, percentage or bar, where the displayed
+    // number is derived and searching for it directly finds nothing.
     public static List<Hit> Delta(Snapshot before, Snapshot after, Width w, double delta,
                                   double tolerance = 1e-3)
     {
@@ -152,22 +132,10 @@ public static class Compare
 
     public readonly record struct SlotPair(uint First, uint Second, double Value);
 
-    /// <summary>
-    /// Find a slot array being filled one entry at a time, from three
-    /// snapshots taken before, after one acquisition, and after a second.
-    /// </summary>
-    /// <remarks>
-    /// This is what found the inventory. Items in Dead Souls do not stack -
-    /// two Tauriners occupy two records of quantity 1 - so there is no count
-    /// going 1 -> 2 to search for. The signature is instead two <i>different</i>
-    /// addresses receiving the <i>same</i> value at different times:
-    /// <code>
-    ///   slot A:  0 -> id -> id
-    ///   slot B:  0 -> 0  -> id
-    /// </code>
-    /// <paramref name="maxGap"/> keeps only pairs close enough to plausibly be
-    /// neighbouring records, which discards almost all coincidence.
-    /// </remarks>
+    // Finds a slot array filled one entry at a time, from three snapshots. For
+    // items that do not stack there is no count to watch; the signature is two
+    // different addresses taking the same value at different times:
+    //   slot A: 0 -> id -> id      slot B: 0 -> 0 -> id
     public static List<SlotPair> SlotFills(Snapshot a, Snapshot b, Snapshot c, Width w,
                                            uint maxGap = 0x400)
     {

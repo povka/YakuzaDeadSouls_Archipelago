@@ -5,35 +5,9 @@ using System.Text;
 
 namespace YakuzaDeadSouls.Ps3;
 
-/// <summary>
-/// PS3MAPI over the binary TCP server on port 7887. Reads and writes the
-/// memory of a process on a jailbroken PS3 across the network.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Measured against a Slim CECH-25xx running Evilnat 4.93, webMAN MOD 1.47.48,
-/// PS3MAPI server 0x125: 64 KB per read, ~61 ms per round trip, ~1 MB/sec. The
-/// round trip dominates completely - a 64 KB read costs the same as a 4-byte
-/// one - so read one span and slice it rather than issuing many small reads.
-/// </para>
-/// <para>
-/// The server is <b>off by default</b>. It is enabled in webMAN's <i>Setup</i>
-/// page (not the PS3MAPI page): the VSH MENU section, on the DEL CFW SYSCALLS
-/// line, a dropdown named <c>sc8</c>. It only binds the port at boot, so the
-/// console must be rebooted afterwards.
-/// </para>
-/// <para>
-/// <b>Never</b> read memory through webMAN's <c>/ps3mapi.ps3?MEMORY GET</c>
-/// JSON bridge. On 1.47.48 it zeroes the high nibble of every byte returned,
-/// producing data that looks structured and is wrong. The tell is that every
-/// byte comes back &lt;= 0x0F.
-/// </para>
-/// </remarks>
 public sealed class Ps3MapiClient : IDisposable
 {
     public const int DefaultPort = 7887;
-
-    /// <summary>No cap was found; this is a sane transfer unit.</summary>
     public const int MaxRead = 65536;
 
     private readonly string _host;
@@ -51,7 +25,6 @@ public sealed class Ps3MapiClient : IDisposable
 
     public bool Connected => _control?.Connected == true;
 
-    /// <summary>Is anything listening on the PS3MAPI port?</summary>
     public static bool IsAvailable(string host, int port = DefaultPort, int timeoutMs = 1500)
     {
         try
@@ -78,9 +51,6 @@ public sealed class Ps3MapiClient : IDisposable
         _buffer = new StringBuilder();
         _binary = false;
 
-        // Greeting is 220, then 230 once the server will take commands. Read
-        // until the 230 rather than assuming a line count - builds differ in
-        // how much banner they send.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
@@ -95,14 +65,12 @@ public sealed class Ps3MapiClient : IDisposable
     {
         if (_control is not null)
         {
-            try { Send("DISCONNECT"); } catch (Exception) { /* closing anyway */ }
-            try { _control.Close(); } catch (Exception) { /* closing anyway */ }
+            try { Send("DISCONNECT"); } catch (Exception) { }
+            try { _control.Close(); } catch (Exception) { }
         }
         _control = null;
         _stream = null;
     }
-
-    // -- control channel ----------------------------------------------------
 
     private void Send(string line)
     {
@@ -138,7 +106,6 @@ public sealed class Ps3MapiClient : IDisposable
         return (code, line.Length > 4 ? line[4..] : string.Empty);
     }
 
-    /// <summary>Read responses until a final one, skipping continuation lines.</summary>
     private (int Code, string Text) Await(params int[] accept)
     {
         while (true)
@@ -157,8 +124,6 @@ public sealed class Ps3MapiClient : IDisposable
         return Await().Text;
     }
 
-    // -- data channel -------------------------------------------------------
-
     private void EnsureBinary()
     {
         if (_binary) return;
@@ -166,7 +131,6 @@ public sealed class Ps3MapiClient : IDisposable
         _binary = true;
     }
 
-    /// <summary>Open the PASV data connection a memory transfer needs.</summary>
     private TcpClient OpenDataConnection()
     {
         Send("PASV");
@@ -183,7 +147,6 @@ public sealed class Ps3MapiClient : IDisposable
 
         var nums = parts.Select(p => int.Parse(p.Trim(), CultureInfo.InvariantCulture)).ToArray();
         var host = string.Join('.', nums.Take(4));
-        // Some builds report 0.0.0.0; fall back to the control host.
         if (host == "0.0.0.0") host = _host;
         var port = nums[4] * 256 + nums[5];
 
@@ -195,9 +158,6 @@ public sealed class Ps3MapiClient : IDisposable
         return data;
     }
 
-    // -- memory -------------------------------------------------------------
-
-    /// <summary>Read process memory. Splits requests larger than MaxRead.</summary>
     public byte[] ReadMemory(uint pid, uint address, int size)
     {
         if (size <= 0) return [];
@@ -231,7 +191,6 @@ public sealed class Ps3MapiClient : IDisposable
         return result;
     }
 
-    /// <summary>Write process memory.</summary>
     public void WriteMemory(uint pid, uint address, ReadOnlySpan<byte> payload)
     {
         EnsureBinary();
@@ -243,11 +202,7 @@ public sealed class Ps3MapiClient : IDisposable
         Await(226, 250);
     }
 
-    /// <summary>Load an SPRX into a running process - the stage-2 injection path.</summary>
     public string LoadModule(uint pid, string path) => Command($"MODULE LOAD {pid} {path}");
 }
 
-public class Ps3Exception : Exception
-{
-    public Ps3Exception(string message) : base(message) { }
-}
+public class Ps3Exception(string message) : Exception(message);

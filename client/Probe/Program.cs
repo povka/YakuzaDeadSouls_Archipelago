@@ -1,7 +1,17 @@
 using System.Diagnostics;
 using YakuzaDeadSouls.Ps3;
 
-var host = args.Length > 0 ? args[0] : "192.168.1.129";
+string host;
+try
+{
+    host = Ps3Config.Require(args.Length > 0 ? args[0] : null);
+}
+catch (Ps3Exception ex)
+{
+    Console.WriteLine(ex.Message);
+    return 1;
+}
+
 Console.WriteLine($"connecting to {host} ...");
 
 if (!Ps3MapiClient.IsAvailable(host))
@@ -40,8 +50,7 @@ for (var i = 0; i < items.Length; i++)
     var name = Inventory.KnownItems.TryGetValue(items[i].Id, out var known) ? known : "?";
     Console.WriteLine($"  slot {i}: id={items[i].Id} x{items[i].Quantity}  {name}");
 }
-var free = Inventory.FindFreeSlot(game);
-Console.WriteLine($"  first free slot: 0x{free:X8}");
+Console.WriteLine($"  first free slot: 0x{Inventory.FindFreeSlot(game):X8}");
 
 Console.WriteLine("\nsegment layout (from the live ELF headers):");
 var layout = ElfMap.Read(game);
@@ -49,15 +58,14 @@ Console.WriteLine($"  entry 0x{layout.Entry:X8}");
 foreach (var seg in layout.Segments.Where(x => x.MemorySize > 0))
     Console.WriteLine($"  {seg.FlagString,3}  0x{seg.VirtualAddress:X8} - 0x{seg.End:X8}  {seg.MemorySize / 1024.0 / 1024:F1} MB");
 
-var notifier = new Notifier(host);
-Console.WriteLine($"\nCCAPI reachable: {await notifier.IsCcapiAvailableAsync()}");
+Console.WriteLine($"\nCCAPI reachable: {await new Notifier(host).IsCcapiAvailableAsync()}");
 
 var sw = Stopwatch.StartNew();
-const int n = 10;
-for (var i = 0; i < n; i++) game.Read(Addresses.DataBase, 65536);
+const int reads = 10;
+for (var i = 0; i < reads; i++) game.Read(Addresses.DataBase, 65536);
 sw.Stop();
-var perRead = sw.Elapsed.TotalMilliseconds / n;
-Console.WriteLine($"\n  {n}x 64 KB reads: {perRead:F1} ms each, {64 * 1000 / perRead / 1024:F2} MB/s");
+var perRead = sw.Elapsed.TotalMilliseconds / reads;
+Console.WriteLine($"\n  {reads}x 64 KB reads: {perRead:F1} ms each, {64 * 1000 / perRead / 1024:F2} MB/s");
 
 Console.WriteLine("\ndone.");
 return 0;

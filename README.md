@@ -39,6 +39,7 @@ is a workbench; the deliverable runs on the real machine.
 - **Yakuza: Dead Souls.** Developed against `NPEB02034`, the EU PSN digital
   release. The disc releases are unverified — addresses will differ.
 - **.NET 9 SDK** on the PC.
+- Your console's LAN address, configured once — see below.
 - Console and PC on the same LAN.
 
 Developed against a Slim CECH-25xx running **Evilnat 4.93 (Cobra 8.5)**. CCAPI
@@ -51,8 +52,18 @@ is optional; if present it is used for nicer notifications and nothing else.
 Everything a multiworld client needs, verified against a real console running
 the real game: read, write, on-screen messaging, and granting an item.
 
+Tell the tools where your console is, once. Any of these work, in order of
+precedence:
+
 ```bash
-dotnet run --project client/Probe -- 192.168.1.129
+echo 192.168.1.50 > console.txt
+```
+
+or set `YDS_PS3_HOST`, or pass the address as an argument. `console.txt` is
+git-ignored, so it stays a local setting.
+
+```bash
+dotnet run --project client/Probe
 ```
 
 Lists processes, attaches, proves the bytes are not corrupted by reading the
@@ -60,15 +71,16 @@ ELF header, prints money/HP/EXP/inventory, dumps the segment layout from the
 live ELF program headers, and benchmarks the link (~1.3 MB/s).
 
 ```bash
-dotnet run --project client/Scanner -- 192.168.1.129 snap before
+dotnet run --project client/Scanner -- snap before
 # change something in game
-dotnet run --project client/Scanner -- 192.168.1.129 snap after
-dotnet run --project client/Scanner -- 192.168.1.129 delta before after 50 --all
+dotnet run --project client/Scanner -- snap after
+dotnet run --project client/Scanner -- delta before after 50 --all
 ```
 
-Value scanner. A full 4 MB sweep of the data segment takes about three seconds,
-so every pass re-reads everything and filters offline — which means one capture
-can be reinterpreted at every width instead of committing to a guess.
+A full 4 MB sweep of the data segment takes about three seconds. Only `snap`
+talks to the console; every other command works offline on saved snapshots,
+which is what lets one capture be reinterpreted at any width instead of
+committing to a guess up front.
 
 | Command | What it does |
 |---|---|
@@ -118,12 +130,13 @@ with no dependencies.
 - **Never read memory through `/ps3mapi.ps3?MEMORY GET`.** webMAN 1.47.48's
   JSON bridge zeroes the high nibble of every byte. The output looks plausible
   and is wrong. The tell is that every byte comes back `<= 0x0F`. This repo
-  routes reads through `/getmem.ps3mapi` instead; `probe.py` checks for the bug
-  explicitly.
-- **The PPU is big-endian.** Every struct format in this repo is `>`. A value
-  that reads as `0x01000000` is 1.
+  routes reads through the binary TCP path instead, and `GameProcess.LooksLikeGame`
+  catches it by checking for the ELF header.
+- **The PPU is big-endian.** Every read goes through `BinaryPrimitives.Read*BigEndian`.
+  A value that reads as `0x01000000` is 1.
 - **Zeros prove nothing.** A wrong PID reads as zeros rather than erroring, and
-  so does unmapped memory. Validate the PID against the process list first.
+  so does unmapped memory. The PID changes every time the game launches, so
+  never cache it — resolve it with `Ps3Console.FindGameAsync` each run.
 
 ---
 
@@ -134,8 +147,6 @@ with no dependencies.
   multiworld framework.
 - [**webMAN MOD**](https://github.com/aldostools/webMAN-MOD) by aldostools, and
   the PS3MAPI authors, for the memory API this is built on.
-- [**RPCS3**](https://rpcs3.net/) — not needed to play, but the reason the
-  reverse engineering is possible at all.
 
 ## AI disclosure
 
