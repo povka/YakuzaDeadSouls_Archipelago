@@ -48,6 +48,58 @@ reverse engineering risk.
 
 ---
 
+## Tooling
+
+**C# / .NET 10 everywhere except the apworld.** The apworld has to be Python —
+Archipelago's world API *is* Python and `.apworld` is a zipped Python package
+loaded inside the generator's process. That part never touches the PS3: item and
+location tables, logic rules, options. Everything else is C#, which also matches
+the PS3 ecosystem (PS3Lib, NetCheatPS3, PS3MAPI-NCAPI are all C#), and
+Archipelago ships an official .NET client library with no dependencies.
+
+.NET 10 is LTS to Nov 2028. .NET 9 expires Nov 2026 and was only ever chosen
+because it happened to be installed.
+
+### Projects
+
+| Path | What it is |
+|---|---|
+| `client/Ps3Mapi/` | library: transport, typed big-endian access, addresses, inventory, abilities, notifications |
+| `client/Probe/` | acceptance test — attaches, verifies the ELF header, prints player state |
+| `client/Rpcs3Probe/` | same against a running RPCS3 |
+| `client/Scanner/` | value scanner: `snap`, `eq`, `delta`, `filter`, `slots`, `event`, `watch`, `list` |
+| `client/ItemProbe/` | inventory and memory poking: `read`, `fill`, `unlock`, `restore`, `peek`, `poke`, `fillrange`, `find`, `strings`, `ids` |
+
+### Host configuration
+
+Resolved in precedence order: command-line argument, then the `YDS_PS3_HOST`
+environment variable, then `console.txt` (searched next to the executable and up
+to the repo root, git-ignored). `--rpcs3` targets a local emulator instead and
+needs no address.
+
+### The searches that actually worked
+
+- `delta <a> <b> <n>` — found EXP after a direct value search returned **zero
+  hits at every width**, because the game stores exp counting up while the UI
+  shows a countdown.
+- `slots <a> <b> <c>` — found the inventory. Items do not stack, so there is no
+  count to watch; the signature is two *different* addresses taking the *same*
+  value at different times.
+- `event <idleA> <idleB> <after>` — subtracts ambient churn using two idle
+  snapshots. Roughly 1400-1800 u32 addresses change on their own even sitting in
+  a menu.
+- `watch <file>` — polls a list and prints changes. Mapped all 39 abilities.
+
+### Data files
+
+| File | Contents |
+|---|---|
+| `data/items.tsv` | 1128 entries, ids 0-1127, dumped from the game's name table |
+| `data/ability_bits.tsv` | address + bit + name for all 39 of Akiyama's abilities |
+| `data/ability_names_alt.tsv` | a 69-entry ability string table that is **not** the menu list; kept because it is real, but it does not match bit order |
+
+---
+
 ## The decision that makes this tractable
 
 Reverse engineer in **RPCS3**, ship and play on **hardware**.
@@ -935,7 +987,7 @@ the bitfield has **its own ordering** and no constant offset maps between them.
 | `chara_arc/download.par` | **hostess club DLC** — cabaret girls and their dresses |
 | `chara.par` | everything else, including alternate outfits |
 
-`1.edat` is an NPDRM-encrypted file (magic `NPD `) and yields nothing readable.
+`1.edat` is an NPDRM-encrypted file (magic `NPD\0`) and yields nothing readable.
 
 ### Alternate outfits: present in the EU build
 
