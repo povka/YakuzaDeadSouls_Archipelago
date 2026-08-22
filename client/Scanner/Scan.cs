@@ -138,6 +138,8 @@ public static class Compare
             var b = idleB.Read(w, off);
             var c = after.Read(w, off);
             if (!w.Plausible(a) || !w.Plausible(b) || !w.Plausible(c)) continue;
+            if (a != b) continue;
+            if (b == c) continue;
 
             hits.Add(new Hit(idleB.Base + (uint)off, b, c));
         }

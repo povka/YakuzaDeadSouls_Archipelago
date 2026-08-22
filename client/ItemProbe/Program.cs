@@ -57,28 +57,28 @@ switch (command)
         else Console.WriteLine("regions needs --rpcs3");
         break;
     case "find":
-        if (target is Rpcs3Target r1)
-            YakuzaDeadSouls.ItemProbe.FindStrings.Run(r1, rest.FirstOrDefault(a => !a.StartsWith("--")) ?? "Tauriner");
-        else Console.WriteLine("find needs --rpcs3 (a full RAM sweep over PS3MAPI would take hours)");
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var needle = bare.Length > 0 ? bare[0] : "Tauriner";
+        var from = bare.Length > 1 ? Convert.ToUInt32(bare[1], 16) : 0x30D00000u;
+        var to = bare.Length > 2 ? Convert.ToUInt32(bare[2], 16) : 0x30E00000u;
+        YakuzaDeadSouls.ItemProbe.FindStrings.RunRange(target, needle, from, to);
         break;
+    }
     case "strings":
-        if (target is Rpcs3Target r2)
-            YakuzaDeadSouls.ItemProbe.FindStrings.DumpTable(r2,
-                Convert.ToUInt32(rest.First(a => !a.StartsWith("--")), 16), 60);
-        else Console.WriteLine("strings needs --rpcs3");
+        YakuzaDeadSouls.ItemProbe.FindStrings.DumpTable(target,
+            Convert.ToUInt32(rest.First(a => !a.StartsWith("--")), 16), 60);
         break;
     case "ids":
-        if (target is Rpcs3Target r3)
-        {
-            var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
-            YakuzaDeadSouls.ItemProbe.FindStrings.DumpIds(r3,
-                Convert.ToUInt32(bare[0], 16),
-                bare.Length > 1 ? ushort.Parse(bare[1]) : (ushort)2,
-                bare.Length > 2 ? int.Parse(bare[2]) : 400,
-                Array.IndexOf(rest, "--code") >= 0);
-        }
-        else Console.WriteLine("ids needs --rpcs3");
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        YakuzaDeadSouls.ItemProbe.FindStrings.DumpIds(target,
+            Convert.ToUInt32(bare[0], 16),
+            bare.Length > 1 ? ushort.Parse(bare[1]) : (ushort)0,
+            bare.Length > 2 ? int.Parse(bare[2]) : 400,
+            Array.IndexOf(rest, "--code") >= 0);
         break;
+    }
     case "peek":
     {
         var bare = rest.Where(a => !a.StartsWith("--")).ToArray();

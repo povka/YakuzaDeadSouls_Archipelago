@@ -5,7 +5,7 @@ namespace YakuzaDeadSouls.ItemProbe;
 
 public static class FindStrings
 {
-    public static void Run(Rpcs3Target target, string needle)
+    public static void RunRange(IMemoryTarget target, string needle, uint from, uint to)
     {
         var patterns = new (string Label, byte[] Bytes)[]
         {
@@ -17,14 +17,13 @@ public static class FindStrings
         const int chunk = 4 * 1024 * 1024;
         const int overlap = 64;
 
-        Console.WriteLine($"searching mapped guest memory for \"{needle}\" ...");
+        Console.WriteLine($"searching 0x{from:X8}-0x{to:X8} for \"{needle}\" ...");
         var hits = new List<(uint Addr, string Kind)>();
         var scanned = 0L;
         var gaps = 0;
 
-        foreach (var (regionStart, regionSize, _) in target.MappedGuestRegions())
+        foreach (var (regionStart, regionEnd) in new[] { (from, to) })
         {
-            var regionEnd = regionStart + (uint)Math.Min(regionSize, uint.MaxValue - regionStart);
             for (var at = regionStart; at < regionEnd; at += chunk - overlap)
             {
                 var want = (int)Math.Min((ulong)chunk, regionEnd - at);
@@ -36,13 +35,13 @@ public static class FindStrings
 
                 foreach (var (label, bytes) in patterns)
                 {
-                    var from = 0;
+                    var cursor = 0;
                     while (true)
                     {
-                        var idx = IndexOf(buffer, bytes, from);
+                        var idx = IndexOf(buffer, bytes, cursor);
                         if (idx < 0) break;
                         hits.Add((at + (uint)idx, label));
-                        from = idx + 1;
+                        cursor = idx + 1;
                         if (hits.Count > 200) break;
                     }
                 }
@@ -69,7 +68,7 @@ public static class FindStrings
         return -1;
     }
 
-    public static void DumpTable(Rpcs3Target target, uint at, int count)
+    public static void DumpTable(IMemoryTarget target, uint at, int count)
     {
         var raw = target.ReadMemory(at, 8192);
         var pos = 0;
@@ -94,7 +93,7 @@ public static class FindStrings
         }
     }
 
-    public static void DumpIds(Rpcs3Target target, uint at, ushort firstId, int count, bool asCode)
+    public static void DumpIds(IMemoryTarget target, uint at, ushort firstId, int count, bool asCode)
     {
         var raw = target.ReadMemory(at, 65536);
         var pos = 0;
