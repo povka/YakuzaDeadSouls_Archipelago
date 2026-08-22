@@ -75,7 +75,8 @@ async Task<int> Snap(string name)
 
     using var _ = owned;
 
-    const uint start = Addresses.DataBase, end = Addresses.DataEnd;
+    var start = Opt("--from") is { } f ? Convert.ToUInt32(f, 16) : Addresses.DataBase;
+    var end = Opt("--to") is { } t ? Convert.ToUInt32(t, 16) : Addresses.DataEnd;
     var total = (int)(end - start);
     var buffer = new byte[total];
     var sw = Stopwatch.StartNew();
@@ -226,7 +227,8 @@ int Slots(string a, string b, string c)
 string? Opt(string name)
 {
     var i = Array.IndexOf(rest, name);
-    return i >= 0 && i + 1 < rest.Length ? rest[i + 1] : null;
+    if (i < 0 || i + 1 >= rest.Length) return null;
+    return rest[i + 1].StartsWith("--") ? null : rest[i + 1];
 }
 
 bool Flag(string name) => Array.IndexOf(rest, name) >= 0;
@@ -257,6 +259,7 @@ void Usage() => Console.WriteLine($"""
                                   subtracted using two idle snapshots
 
     options:
+      --from <hex> --to <hex>     region for 'snap' (default: the data segment)
       --rpcs3                     read a running RPCS3 instead of the console
       --host <ip>                 console address (only 'snap' needs it)
       --width u8|u16|u32|f32      default u32

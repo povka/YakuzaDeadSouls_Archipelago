@@ -15,7 +15,8 @@ IDisposable? owned;
 if (Array.IndexOf(rest, "--host") >= 0)
 {
     var i = Array.IndexOf(rest, "--host");
-    var host = Ps3Config.Require(i + 1 < rest.Length ? rest[i + 1] : null);
+    var next = i + 1 < rest.Length ? rest[i + 1] : null;
+    var host = Ps3Config.Require(next is null || next.StartsWith("--") ? null : next);
     var pid = await Ps3Console.FindGameAsync(host);
     if (pid is null) { Console.WriteLine("No game running on the console."); return 1; }
     var client = new Ps3MapiClient(host);
@@ -87,6 +88,22 @@ switch (command)
         var raw = target.ReadMemory(addr, len);
         for (var i = 0; i < len; i += 16)
             Console.WriteLine($"  0x{addr + (uint)i:X8}  {Convert.ToHexString(raw.AsSpan(i, Math.Min(16, len - i)))}");
+        break;
+    }
+    case "fillrange":
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var from = Convert.ToUInt32(bare[0], 16);
+        var to = Convert.ToUInt32(bare[1], 16);
+        var fill = bare.Length > 2 ? Convert.ToByte(bare[2], 16) : (byte)0;
+        if (to <= from) { Console.WriteLine("end must be above start"); break; }
+        var len = (int)(to - from);
+        Console.WriteLine($"  before  {Convert.ToHexString(target.ReadMemory(from, Math.Min(len, 32)))}");
+        var buf = new byte[len];
+        Array.Fill(buf, fill);
+        target.WriteMemory(from, buf);
+        Console.WriteLine($"  after   {Convert.ToHexString(target.ReadMemory(from, Math.Min(len, 32)))}");
+        Console.WriteLine($"  wrote 0x{fill:X2} over {len} bytes, 0x{from:X8}-0x{to:X8}");
         break;
     }
     case "poke":

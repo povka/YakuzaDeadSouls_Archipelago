@@ -792,6 +792,170 @@ stating loudly:
 
 ---
 
+## Game files are readable, and faster than memory
+
+webMAN's web server serves the installed game directory over HTTP, and it is
+**~17 MB/s** — more than 10x PS3MAPI's 1.3 MB/s.
+
+**It does NOT honour HTTP `Range`.** Sending one returns the whole file anyway,
+silently. The 63 `chara_arc` archives are ~10 MB each so this went unnoticed
+(517 MB in 38 s reads like a fast partial fetch), but `chara.par` is ~1 GB and
+every "96 KB header fetch" against it downloads the lot. Download large
+archives once to disk and query the local copy.
+
+Game data lives at `/dev_hdd0/game/NPEB02034/USRDIR/data/`.
+
+### PAR archives
+
+`PARC` is SEGA's archive format, big-endian here:
+
+```
+0x00  "PARC"
+0x04  flags (0x02 = big endian)
+0x10  u32 directory count
+0x14  u32 directory table offset
+0x18  u32 file count
+0x1C  u32 file table offset
+```
+
+Filenames sit as plain ASCII between the header and the directory table, so
+`re.findall(rb'[ -~]{4,}', data[0x20:diroffset])` reads the contents listing
+without decompressing anything. Entry *data* is compressed (`SLLZ` blocks) and
+textures are `DXT1`/`DXT5`, so plaintext search inside entries finds nothing.
+
+Model naming: `c_am_` character/adult male, `c_fw_`/`c_bw_` female hostess
+face/body, `c_zn_` zombie, `c_ak_` child. Suffixes `_di _tn _mt _sp _rd` are
+texture maps, `.gmd` is the model.
+
+### PAR file table format (decoded)
+
+After the 64-byte-per-entry name table, the file table at `fileOffset` holds
+32-byte entries, big-endian:
+
+```
++0x00  u32  flags     0x80000000 = SLLZ-compressed, 0 = stored plain
++0x04  u32  uncompressed size
++0x08  u32  compressed size
++0x0C  u32  data offset
++0x10  u32  0x20
++0x1C  u32  timestamp
+```
+
+Names live as 64-byte NUL-padded fields starting at 0x60, one per file, in the
+same order as the file table.
+
+**SLLZ decompression is unsolved.** Header is little-endian inside a big-endian
+container: `"SLLZ"`, endian byte, version, `u16` header size (0x10), `u32`
+uncompressed size, `u32` compressed size. The payload is not a plain
+flag-byte + literal/match LZ77 — sixteen combinations of flag polarity, offset
+width (11/12/13 bits), offset base and length base all failed to produce a full
+decode. Entries stored with flags `0` are readable directly and are the way in
+where one exists.
+
+### The ability bitfield at `0x01530210`
+
+Mapped by clearing the field, granting 255 ability points, and buying abilities
+one at a time while `watch` recorded which bit flipped. Confirmed:
+
+| Bit | Ability | Bit | Ability |
+|---|---|---|---|
+| 0 | Max Focus: Epic | 5 | Unarmed Expertise |
+| 1 | Head Tracking | 6 | Demolition Man |
+| 2 | Head Lock-On | 7 | Rapid Reload |
+| 3 | Super Grip | 8 | Head Hunter |
+| 4 | Iron Arm | 9 | Unarmed Mastery |
+
+Bits 1-9 are the Combat tab in menu order; bit 0 is the Basic tab's Max Focus:
+Epic. Recorded in `data/ability_bits.tsv`.
+
+#### SOLVED — all 39 of Akiyama's abilities
+
+The first pass reported ~30 abilities "not firing". That was **contamination
+from my own earlier test**: `0x01530210` and `0x01530214` had been left at
+`FFFFFFFF`, so every ability stored there already read as owned and buying it
+changed nothing. An all-ones field cannot tell you anything — every write is a
+no-op. *Restore test writes immediately.*
+
+It also produced a wrong theory (a "second storage location"). There is no
+second location; the array simply extends **backwards** from `0x01530210`.
+
+After clearing `0x015301F0`-`0x01530220` and re-buying, all 39 purchases fired,
+each flipping exactly one bit. Full mapping in `data/ability_bits.tsv`.
+
+| Word | Bits used | Contents |
+|---|---|---|
+| `0x0153020C` | 2-20, 22-31 | combat moves, Focus chain, all slot and skill upgrades |
+| `0x01530210` | 0-9 | Max Focus: Epic, then Combat tab in menu order |
+
+Notable:
+
+- **Slot upgrades are bits, not counts.** `Inventory Slots: 12/14/18/20/22/24`
+  each own a bit (`0x0153020C` bits 5-10), as do weapon and accessory slots.
+  Granting inventory space is a single bit set.
+- **Bit 21 of `0x0153020C` is unused**, sitting between Weapon Skill: Expert
+  (20) and Armor Skill: Intermediate (22).
+- **`0x01530210` bits 10-31 are unused**, and the words either side are zero.
+  Ample room for the other three protagonists, which fits the four-character
+  structure.
+
+#### Why the earlier offset hunt was doomed
+
+The menu calls these *"Max Focus: Epic"*, *"Focus Recovery: Enhanced"* and
+*"Inventory Slots: 12"*. The string table dumped from `0x30D6CF03` calls the
+same things *"Epic Max Focus"*, *"Enhanced Focus Recovery"* and *"Carry 12
+Items"*. **It is a different string table** — not the menu list — so no offset
+was ever going to reconcile bit order with it. That file is kept as
+`data/ability_names_alt.tsv` rather than deleted, since it is still a real
+in-game table, just not this one.
+
+Lesson: before hunting for an offset between two orderings, confirm the two
+lists are actually the same list.
+
+### DEAD END for now: ability bit mapping from game files
+
+`ikusei/` turned out to be **hostess club training** data, not the player
+ability tree — `sug`, `eha`, `och`, `oto`, `wat` are hostess abbreviations and
+`sabori` is Japanese for slacking off. Only `ikusei_fighter.bin` (3855 bytes
+uncompressed) and `ft_hurt.bin` look combat-related, and both are SLLZ, so they
+are locked behind the unsolved decompressor.
+
+No pointer table to the ability name strings exists in either the data segment
+or the 1 MB around the strings themselves, so the names are not referenced by
+address from an indexable array.
+
+**What is established about the bitfield:** bit 0 = *Epic Max Focus*, bit 1 =
+*Head Tracking*. Those are indices 4 and 29 in the menu-order name table, so
+the bitfield has **its own ordering** and no constant offset maps between them.
+
+### Where things actually live
+
+| Archive | Contents |
+|---|---|
+| `chara_arc/install.par` | the four protagonists' base models |
+| `chara_arc/download.par` | **hostess club DLC** — cabaret girls and their dresses |
+| `chara.par` | everything else, including alternate outfits |
+
+`1.edat` is an NPDRM-encrypted file (magic `NPD `) and yields nothing readable.
+
+### Alternate outfits: present in the EU build
+
+Confirmed in `chara.par`:
+
+```
+c_am_kiryu_american          Kiryu's "Americana" outfit
+c_am_kiryu_darts_american    darts-minigame variant
+b0_c_ak_haruka_devil         Haruka's "Devil" outfit
+```
+
+**Method note.** An earlier pass concluded these were absent. That was wrong
+twice over: it searched only `chara_arc` and not `chara.par`, and it searched
+for `stars`/`stripe` from the US pre-order name. The asset is named
+`american`. A negative result from a guessed keyword over an incomplete search
+area is worth nothing — widen the area and vary the term before concluding
+anything is missing.
+
+---
+
 ## Prior art
 
 **For Dead Souls itself: none.** ModDB has a sound effect / HD font / HUD mod
