@@ -57,7 +57,6 @@ public static class Abilities
 
     public static ItemClass Classify(int index, string name)
     {
-        // TODO(human): decide how each ability enters the Archipelago item pool.
-        return ItemClass.Filler;
+        return ItemClass.Useful;
     }
 }

@@ -38,9 +38,10 @@ if (!game.LooksLikeGame()) { Console.WriteLine("FAIL: no ELF header at 0x10000")
 Console.WriteLine("ELF header present - reads work and bytes are not corrupted.");
 
 Console.WriteLine($"\n  money  {game.ReadU32(Addresses.Money),8} yen");
+Console.WriteLine($"  level  {game.ReadU8(Addresses.Level),8}   Ability points {game.ReadU8(Addresses.AbilityPoints)}");
+Console.WriteLine($"  exp    {game.ReadU32(Addresses.Exp),8}   total {game.ReadU32(Addresses.ExpTotal)}");
 Console.WriteLine($"  hp     {game.ReadU16(Addresses.HealthCurrent),8} / {game.ReadU16(Addresses.HealthMax)}");
-var exp = game.ReadU32(Addresses.Exp);
-Console.WriteLine($"  exp    {exp,8}   (to next: {Addresses.Level1Threshold - exp})");
+Console.WriteLine($"  focus  {game.ReadF32(Addresses.FocusCurrent),8} / {game.ReadF32(Addresses.FocusMax)}");
 
 Console.WriteLine("\ninventory:");
 var items = Inventory.Read(game);
@@ -50,7 +51,9 @@ for (var i = 0; i < items.Length; i++)
     var name = Inventory.KnownItems.TryGetValue(items[i].Id, out var known) ? known : "?";
     Console.WriteLine($"  slot {i}: id={items[i].Id} x{items[i].Quantity}  {name}");
 }
-Console.WriteLine($"  first free slot: 0x{Inventory.FindFreeSlot(game):X8}");
+var free = Inventory.FindFreeSlot(game);
+Console.WriteLine(free is null ? "  inventory full - no free slot"
+                               : $"  first free slot: 0x{free:X8}");
 
 Console.WriteLine("\nsegment layout (from the live ELF headers):");
 var layout = ElfMap.Read(game);

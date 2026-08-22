@@ -16,18 +16,20 @@ public static class Addresses
     public const uint DataEnd = 0x0172C408;
 
     // Unclaimed page padding between the segments. Writable on hardware,
-    // REFUSED by RPCS3. For a write test that works on both, use ExpMirror.
+    // REFUSED by RPCS3.
     public const uint ScratchBase = 0x01310768;
 
     public const uint Money = 0x01537E18;
     public const uint HealthCurrent = 0x0154BDB4;
     public const uint HealthMax = 0x0154BDB6;
-    public const uint Exp = 0x0154BDCC;
-    public const uint ExpMirror = 0x0154BDC8;   // nothing reads this
+    public const uint FocusCurrent = 0x0154BDB8;
+    public const uint FocusMax = 0x0154BDBC;
+    public const uint Exp = 0x0154BDCC;         // progress within the current level
+    public const uint ExpTotal = 0x0154BDC8;    // cumulative; does not drive the display
+    public const uint Level = 0x0154BDC4;       // u8
+    public const uint AbilityPoints = 0x0154BDD6;  // u8
     public const uint AmmoDisplay = 0x01536731; // HUD only; not what the gun fires
     public const uint StatsBase = 0x0154BDB0;
-
-    public const uint Level1Threshold = 150;
 }
 
 // 8-byte records at stride 8: [u16 id][u16 pad][u32 quantity].

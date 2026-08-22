@@ -130,8 +130,13 @@ Very little, which is what makes dual-target shipping cheap. Confirmed so far:
 
 The padding is claimed by no program header, so RPCS3 evidently does not map it
 writable where lv2 handed out full pages. It only matters because it was the
-chosen scratchpad for write tests: on RPCS3 use `ExpMirror` (`0x0154BDC8`)
-instead, which sits in the RW segment and is provably inert.
+chosen scratchpad for write tests: on RPCS3, write to any address in the RW data
+segment and restore it afterwards.
+
+`0x0154BDC8` was previously recommended here as "provably inert". **It is not** —
+it holds cumulative total EXP. Writing there does not move the level display,
+which is all that was ever demonstrated, but that is not the same as being
+unused.
 
 ### Reading RPCS3
 
@@ -504,6 +509,68 @@ flag-like signature:
                                 0x0164A41F  30 -> B0 -> F0
 0x0150EACC - 0x0150EE9F    changed at the first transition, stable after
 ```
+
+### The stats struct, re-read at level 7
+
+Several fields only became legible once the character had levelled. What was
+recorded at level 1 was partly wrong.
+
+| Offset | Address | Type | Meaning |
+|---|---|---|---|
+| +0x00 | `0x0154BDB0` | u32 | unknown, reads 2 |
+| +0x04 | `0x0154BDB4` | u16 | HP current |
+| +0x06 | `0x0154BDB6` | u16 | HP max |
+| +0x08 | `0x0154BDB8` | **f32** | **Focus current** |
+| +0x0C | `0x0154BDBC` | **f32** | **Focus max** (4000.0) |
+| +0x10 | `0x0154BDC0` | f32 | unknown, reads 1.0 — multiplier? |
+| +0x14 | `0x0154BDC4` | u8 | **Level** |
+| +0x18 | `0x0154BDC8` | u32 | EXP **total**, cumulative |
+| +0x1C | `0x0154BDCC` | u32 | EXP **within the current level** |
+| +0x26 | `0x0154BDD6` | u8 | **Ability points** |
+
+Note the struct mixes widths freely — HP is a `u16` pair and Focus is an `f32`
+pair four bytes later. Reading either with the wrong accessor returns a
+plausible number rather than an error: `0x457A0000` (4000.0) read as `u16`
+gives 17786.
+
+#### Focus, and the evidence that settled it
+
+Found by writing 1000.0 over a full 4000.0 gauge. The in-game bar did **not**
+appear to change, because the pause menu had already drawn itself — the same
+caching that hid the level display earlier.
+
+What proved it was the *next* read: the value had become **1036.0**. The game
+had regenerated it. A value that climbs on its own after being written is being
+actively read and written by the game, which is far stronger evidence than a
+static readback — that only shows nobody objected.
+
+This also inverts the ammo-display failure. There the display followed while
+behaviour did not; here behaviour followed while the display appeared not to.
+**Watch what the game does with a value, not what the screen shows.**
+
+**Correction: `+0x18` is not an "EXP mirror".** It was recorded as one because
+at level 1 it held the same value as `+0x1C`. At level 7 they read 4950 and 900
+— total versus current-level progress. Two fields that happen to agree early
+are not the same field.
+
+### DEAD END: the next-level threshold is not readable
+
+The probe printed `to next: 4294966546`, which is unsigned underflow from a
+hardcoded `Level1Threshold = 150` — a level-1 observation mistaken for a
+constant. Thresholds scale with level: 150 at level 1, 1650 at level 7.
+
+Searching for 1650 across the data segment gave exactly one u16 hit, at
+`0x014F4ABC`, and it is **coincidence** — the surrounding values are noise and
+an `SLLZ` magic sits just after, so that region is SEGA-compressed data, not a
+table.
+
+Two points fit `150 + (level-1) * 250`, but a line through two points always
+fits, so that is a guess and is **not** shipped. The display now shows level,
+current EXP and total EXP, all of which are read directly, and omits
+"to next" entirely.
+
+If the threshold is ever needed, the way in is a breakpoint on the level-up
+routine in RPCS3, not a memory search.
 
 ### The character stats struct at `0x0154BDB0`
 
