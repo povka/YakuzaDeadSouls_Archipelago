@@ -30,6 +30,13 @@ public static class Addresses
     public const uint SoulPoints = 0x0154BDD6;     // u8
     public const uint AmmoDisplay = 0x01536731; // HUD only; not what the gun fires
     public const uint StatsBase = 0x0154BDB0;
+
+    // A decrypted USER01 is a verbatim dump of this RAM region:
+    //   ramAddress = saveOffset + SaveToRam
+    public const uint SaveToRam = 0x0152F2D0;
+
+    public static uint FromSave(uint saveOffset) => saveOffset + SaveToRam;
+    public static uint ToSave(uint ramAddress) => ramAddress - SaveToRam;
 }
 
 // 8-byte records at stride 8: [u16 id][u16 pad][u32 quantity].

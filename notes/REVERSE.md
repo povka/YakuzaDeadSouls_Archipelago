@@ -1128,6 +1128,103 @@ certainly exists in memory too. Cheapest route: the player now owns **Yuna's
 Business Card (1046)**, so sweep RAM and search for `1046` as u16 — the hit with
 an 8-byte record around it, at a stride matching neighbouring ids, is the array.
 
+### The save is a verbatim RAM dump: `ram = saveOffset + 0x0152F2D0`
+
+Four independent anchors confirm a single constant offset between a decrypted
+`USER01` and the live data segment:
+
+| Structure | Save offset | Computed RAM | Known RAM |
+|---|---|---|---|
+| Key-item array | `0x00500C` | `0x015342DC` | `0x015342DC` |
+| Money | `0x008B48` | `0x01537E18` | `0x01537E18` |
+| Ability bitfield | `0x000F3C` | `0x0153020C` | `0x0153020C` |
+
+Plus five bytes from the session diff read live and matched their saved values
+exactly. Implemented as `Addresses.SaveToRam` / `FromSave` / `ToSave`.
+
+**This is the most useful result in the project.** The two techniques now
+compose: save diffs give near-zero-noise discovery (51 changed bytes vs 11,522
+noisy RAM addresses), and the bridge to a live, pokeable address is addition. No
+searching required.
+
+### SOLVED: hostess availability is a flag, not the business card
+
+Tested empirically on console. Zeroing **Yuna's Business Card** (id 1046) did
+**not** block requesting her — the card is a *receipt* the game issues, not a key
+it checks. Item-based gating is the wrong lever.
+
+The real gate is a **single byte**:
+
+| Hostess | Club | Availability flag | Save offset |
+|---|---|---|---|
+| Erika Mizushima | Shine | **`0x0153128F`** | `0x001FBF` |
+| Yuna | Jewel | **`0x0153130F`** | `0x00203F` |
+
+Entries are **`0x80` apart**. Both verified live on console: after loading a save
+taken right after Erika's intro, `0x0153128F` read `01` and `0x0153130F` read
+`00`, matching the save exactly. Erika's flag was the only set byte in a
+192-byte window, confirming a large sparse table. If the stride holds, Saaya's
+(Majima's) is a candidate at `0x0153138F` or `0x0153120F` — untested.
+
+Bisected from the two candidate flags in the session diff:
+
+- Both cleared -> Yuna blocked, and the club reset to first-interaction state.
+- `0x01534573` cleared, `0x0153130F` set -> Yuna **requestable**. Not the gate.
+- `0x01534573` set, `0x0153130F` cleared -> Yuna **blocked**. Confirmed.
+
+`0x01534573` is rewritten by the game during the first interaction, so it tracks
+conversation progress rather than availability. Note it will fight a client that
+tries to hold it at zero.
+
+The 32 bytes surrounding `0x0153130F` are **entirely zero** — an isolated set
+byte in a sparse region, which is the signature of a large flag table with most
+entries unset. Erika's gate is very likely a nearby byte in the same table.
+Finding it also yields the table's stride and layout, which would be a strong
+lead for substory and completion flags.
+
+Implemented in `client/Ps3Mapi/Hostesses.cs`.
+
+#### The two hostesses are structurally parallel
+
+Diffing a common baseline (`L06`) against a Yuna intro (`L07`) and an Erika
+intro (`L08`) shows matched structures throughout, which is what made the
+identification safe:
+
+| Structure | Yuna | Erika | Delta |
+|---|---|---|---|
+| Availability flag | `0x203F` | `0x1FBF` | `-0x80` |
+| Conversation progress | `0x52A3` | `0x52A1` | `-2` |
+| Business card record | `0x70BC` (id 1046) | `0x70CC` (id 1048) | `+0x10` |
+| Drunk-ish byte | `0x8745` | `0x8744` | `-1` |
+
+The card offsets match the id-indexed formula exactly
+(`0x500C + 1048*8 = 0x70CC`), a free re-confirmation of that array.
+
+Six regions changed in **both** runs and so are session noise rather than
+hostess state: `0x0A` (play time), `0x5A89`, `0x8B4A` (money), `0x8C03`,
+`0x16424`, `0x18403`. Subtracting those is what reduced the search to a handful
+of bytes.
+
+Erika's run also touched `0x00257F` (`00` -> `08`) with no Yuna counterpart —
+unexplained.
+
+#### Known limitation of flag-gating
+
+The flag blocks the *request*, which is the last step of the interaction. The
+player still walks in, pays the cover charge, and sits through the intro cutscene
+before hitting the wall. Gating this late inherits all the upstream cost.
+
+Options, cheapest first:
+
+1. **Refund and notify** — detect entry, restore the money, re-clear the flag,
+   fire a `PS3 NOTIFY` toast. No new tooling. Cutscene still plays.
+2. **Close the venue** — if a per-venue open/closed state exists, flipping it
+   gives a stock in-game refusal at the door: no cutscene, no charge, no custom
+   text, and it looks native. **Best value; not yet investigated.**
+3. **Custom NPC dialogue** — requires hooking the dialogue system or patching
+   text data, so an SPRX plugin, a PS3 toolchain, and PPC disassembly. A
+   different scale of project; not justified before the world works.
+
 ### Lead: the Completion List is a location source
 
 This build has a **completion list** with rewards collected from Bob B once he
