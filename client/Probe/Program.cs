@@ -43,6 +43,15 @@ Console.WriteLine($"  exp    {game.ReadU32(Addresses.Exp),8}   total {game.ReadU
 Console.WriteLine($"  hp     {game.ReadU16(Addresses.HealthCurrent),8} / {game.ReadU16(Addresses.HealthMax)}");
 Console.WriteLine($"  focus  {game.ReadF32(Addresses.FocusCurrent),8} / {game.ReadF32(Addresses.FocusMax)}");
 
+Console.WriteLine("\nhostesses (goal: both maxed):");
+foreach (var (id, who) in new (ushort, string)[]
+         {
+             (KeyItems.YunaCard, "Yuna    card"), (KeyItems.YunaFancyCard, "Yuna    FANCY"),
+             (KeyItems.ErikaCard, "Erika   card"), (KeyItems.ErikaFancyCard, "Erika   FANCY"),
+         })
+    Console.WriteLine($"  {who}  {(KeyItems.Has(game, id) ? "yes" : "-")}   0x{KeyItems.AddressOf(id):X8}");
+Console.WriteLine($"  => goal complete: {KeyItems.AkiyamaHostessesMaxed(game)}");
+
 Console.WriteLine("\ninventory:");
 var items = Inventory.Read(game);
 for (var i = 0; i < items.Length; i++)

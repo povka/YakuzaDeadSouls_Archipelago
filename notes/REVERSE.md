@@ -955,6 +955,179 @@ Consequence: unlocking Premium Adventure may not require the imported save to
 load at all. Find the clear flag by diffing, set it in the console's *own* save,
 re-encrypt and resign. That sidesteps the entire import problem.
 
+## First milestone: Akiyama, "2 hostesses maxed out"
+
+Chosen 2026-08-23. Scope the first shippable AP world to **Akiyama only**, goal
+condition **two hostesses raised to maximum**. All seven characters come later.
+
+Why this goal fits Archipelago well:
+
+- **It is pre-post-game.** Everything the project got blocked on — Premium
+  Adventure, the outfit selector, Bob's challenges — sits behind beating the
+  game. The hostess system does not.
+- **It has a built-in item pool.** Catalogue ids 300-425 are all hostess
+  content, and they *gate* the goal: a hostess cannot be maxed without the right
+  outfits, accessories, drinks and gifts. That is exactly the dependency
+  structure a randomizer wants, rather than an item pool bolted on beside it.
+- **It has natural checks.** Per-hostess rank-ups are discrete, ordered and
+  persistent.
+
+Catalogue breakdown of the hostess block:
+
+| Ids | Contents |
+|---|---|
+| 300-312 | drinks (White Champagne, Yamazaki 12, Beer, ...) |
+| 313-324 | food (Fruit Platter, Chicken Basket, Chocolate, ...) |
+| 355-361 | gifts (Italian Women's Suit, Italian Ring, Caviar Skin Bag, ...) |
+| 362-384, 399-425 | outfits (dresses, Chinese Dress, Maid, Schoolgirl, ...) |
+| 385-397 | accessories (Tiara, Cat Ears, necklaces, watches, rings) |
+
+Note ids 308-312 (`Drink 11`-`Drink 15`) and 319-324 (`Food 6`-`Food 11`) are
+placeholder names in the game's own table, matching the `Dummy`/`Temp` pattern
+documented for weapons. Filter them out of any item pool.
+
+### What still has to be found for this milestone
+
+1. ~~The hostess roster~~ **Confirmed: exactly two.**
+
+   | Hostess | Club |
+   |---|---|
+   | Erika Mizushima | Shine |
+   | Yuna | Jewel |
+
+   The same pair as Yakuza 4's Hostess Maker, reused here. Because there are
+   only two, the goal "2 hostesses maxed out" is **100% of the hostess
+   content**, not a subset — which makes the goal test simple and removes any
+   need for the player to choose which hostesses count.
+
+   Confirmed reachable in Part I Chapter 2, so the whole milestone is testable
+   from an early save.
+2. **Per-hostess progression state** — where rank/affection lives, in save and in
+   RAM. Needed for both the checks and the goal test. Expect **two parallel
+   structures**, one per hostess; finding one gives the other by symmetry.
+3. **The "maxed" threshold** — what value counts as complete.
+4. **Whether the hostess club is reachable in the current save** (Part I
+   Chapter 2). If not, how early it opens.
+
+Items 2 and 3 are what the save-diff loop is for: save, run one hostess session,
+save again, decrypt both, diff. Hostess rank is persistent state, so it must
+appear in `USER01`, and the diff surface for a single session should be tiny
+compared to the 4,975 bytes separating a chapter-2 save from a 130-hour one.
+
+### SOLVED: the goal condition is two key items
+
+A controlled save diff (save, one hostess session, save) changed **51 bytes in
+16 regions** out of 151,680 — versus 11,522 noisy addresses for the equivalent
+RAM diff. The technique works.
+
+#### The id-indexed key-item array
+
+Key items live in a **flat array indexed by item id**, 8 bytes per entry, same
+record layout as the RAM inventory:
+
+```
+offset = 0x00500C + (itemId * 8)        [u16 id][u16 pad][u32 quantity]
+```
+
+An owned item has `id == index` and `quantity >= 1`; an unowned one is all
+zeroes. Unlike the RAM inventory this is **not** a packed list — every item has a
+permanent home, so "does the player own X" is a single read at a computed
+offset, with no scanning.
+
+Validity: clean for **ids >= 550** (verified across the 130-hour save: every slot
+is either empty or holds its own index). Below 550 the computed offsets collide
+with other structures — the flag blocks at `0x005080`-`0x0051A0` among them — so
+do not use the formula there. The top end runs to roughly id 1126 before it
+abuts the weapon array at `0x007340`.
+
+#### The goal test
+
+Maxing a hostess grants her **Fancy Business Card**. Confirmed by comparing an
+early save against the 130-hour completed one:
+
+| Hostess | Plain card | Offset | Fancy card | Offset |
+|---|---|---|---|---|
+| Yuna | 1046 | `0x0070BC` | **1047** | `0x0070C4` |
+| Erika | 1048 | `0x0070CC` | **1049** | `0x0070D4` |
+| Saaya | 1050 | `0x0070DC` | **1051** | `0x0070E4` |
+
+The completed save holds all six. The test save holds only 1046, granted by the
+single session that was played.
+
+So **"2 hostesses maxed out" reduces to two single-address reads** — no rank
+counter, no threshold to discover, no per-hostess state machine. Whether the goal
+should require Yuna + Erika specifically or any two of three depends on Saaya
+(see below).
+
+#### Saaya is a third hostess
+
+Ids 1050/1051 exist and the 130-hour save owns both. The player reported only two
+clubs reachable at Part I Chapter 2 — Erika at **Shine**, Yuna at **Jewel** — so
+Saaya is either a later unlock or a third club not yet open. Resolve before
+fixing the goal logic, since "2 of 2" and "2 of 3" are different worlds.
+
+#### Still-unexplained bytes from the session diff
+
+Candidates for hostess rank/affection and other per-session state:
+
+| Offset | L06 -> L07 | Guess |
+|---|---|---|
+| `0x00203F` | `00` -> `01` | flag |
+| `0x0052A3` | `00` -> `01` | flag |
+| `0x005661`-`0x00568B` | float-shaped | player position/rotation |
+| `0x008745` | `00` -> `40` | **drunkenness** (player reported being lightly drunk) |
+| `0x008C03` | `06` -> `07` | counter |
+| `0x0091CD`, `0x016189` | `eb1eae` -> `f33622` | same value twice; timestamp or RNG seed |
+| `0x016424` | `00..00` -> `0800000000000006` | 8-byte record, value 6 |
+| `0x018403` | `01` -> `02` | counter |
+| `0x0184DC`, `0x01856C`, `0x0185B4` | zero -> set | position-shaped |
+
+Confirmed in the same diff: **money is a u32 BE at `0x008B48`** (60000 -> 48450),
+and play time at `0x08` behaved as predicted.
+
+`0x008745` is worth chasing: the player suggested forced drunkenness as an
+Archipelago trap item, and a single byte going `00` -> `40` on a save where they
+were "lightly drunk" is a strong lead.
+
+### SOLVED: the RAM key-item array
+
+```
+RAM address = 0x015342DC + (itemId * 8)
+```
+
+Found by sweeping the data segment for `1046` as u16 (the player had just been
+granted Yuna's Business Card). Seven hits; the correct one was identified by
+**fingerprinting** — computing the implied array base for each candidate and
+checking whether *every* key item the save says the player owns (896, 917, 1046)
+appears at the predicted offset. Only `0x0153638C` matched 3/3; all six others
+matched 1/3, i.e. only the id that was searched for.
+
+Verified live on console:
+
+| Item | Address | Value |
+|---|---|---|
+| 1046 Yuna's Business Card | `0x0153638C` | `0416000000000001` (owned) |
+| 1047 Yuna's Fancy | `0x01536394` | zeroes |
+| 1048 Erika's Business Card | `0x0153639C` | zeroes |
+| 1049 Erika's Fancy | `0x015363A4` | zeroes |
+
+Same validity caveat as the save-side array: trustworthy for ids >= ~550. Note
+`Inventory.Base` (`0x01534DE4`) falls inside the computed range at index ~353,
+so the low ids are genuinely other structures, not key-item slots.
+
+Implemented in `client/Ps3Mapi/KeyItems.cs`.
+
+**Saaya belongs to Majima**, confirmed by the player — so an Akiyama-only world
+has exactly two hostesses and the goal is 1047 AND 1049.
+
+### Next: find the RAM mirror of the key-item array
+
+The AP client must detect checks live, not from saves. The save is a
+serialization of RAM structures, so an id-indexed key-item array almost
+certainly exists in memory too. Cheapest route: the player now owns **Yuna's
+Business Card (1046)**, so sweep RAM and search for `1046` as u16 — the hit with
+an 8-byte record around it, at a stride matching neighbouring ids, is the array.
+
 ### Lead: the Completion List is a location source
 
 This build has a **completion list** with rewards collected from Bob B once he
