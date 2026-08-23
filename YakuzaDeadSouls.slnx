@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/client/">
+    <Project Path="client/ApClient/ApClient.csproj" />
     <Project Path="client/ItemProbe/ItemProbe.csproj" />
     <Project Path="client/Probe/Probe.csproj" />
     <Project Path="client/Ps3Mapi/Ps3Mapi.csproj" />

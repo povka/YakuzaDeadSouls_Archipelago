@@ -1225,6 +1225,214 @@ Options, cheapest first:
    text data, so an SPRX plugin, a PS3 toolchain, and PPC disassembly. A
    different scale of project; not justified before the world works.
 
+### Karaoke: a single global leaderboard, not per-song high scores
+
+Test: sang "Pure Love in Kamurocho", scored 740 (max 1000), saved before (`L08`)
+and after (`L09`). 81 bytes changed in 14 regions.
+
+**The board** lives at save `0x018A30` (RAM `0x01547D00`), ten 4-byte records:
+
+```
+[u8 a][u8 b][u16 score]      sorted descending
+```
+
+`L06` and `L08` — both taken before any singing — hold the *identical* ten
+entries (970, 950, 930, 900, 880, 850, 820, 800, 760, 720). Those are **NPC
+defaults** shipped with the game, confirmed by the player. The 740 was inserted
+at rank 10, evicting the NPC entry `17 01 02D0`:
+
+```
+before:  16 03 02F8 (760)   17 01 02D0 (720)
+after:   16 03 02F8 (760)   03 08 02E4 (740)   <- player
+```
+
+**Correction: a per-song table does exist.** The first scan missed it because it
+only looked for *sorted descending* runs of byte-aligned u16 scores, and the
+per-song table is neither sorted nor byte-aligned. See the section below.
+
+The board itself found exactly one instance — karaoke keeps a single global top ten. The meaning of
+the two leading bytes is unresolved; in the player's entry they are `03 08`, and
+the 130-hour save contains many mixed entries (`04 00`, `00 09`, `08 03`, ...).
+One of them is probably the song id.
+
+### SOLVED: per-song karaoke high scores, bit-packed
+
+```
+address = 0x01547CD4 + (songId * 4)        save offset 0x00018A04 + songId*4
+songs 0..10 (11 total); the leaderboard begins right after, at 0x01547D00
+```
+
+Each 4-byte record is **bit-packed**, big-endian:
+
+| Bits | Field |
+|---|---|
+| 31-20 | **high score** (0-1000) |
+| 19-8 | previous score |
+| 7-0 | flags (observed 01-04; meaning unknown) |
+
+Worked example: `0x2E42E401 >> 20 = 0x2E4 = 740`, and `0x2EE2EE01 >> 20 = 0x2EE
+= 750`. Verified live on console for both songs the player sang.
+
+Known song ids:
+
+| Id | Song |
+|---|---|
+| `0x08` | Pure Love in Kamurocho |
+| `0x0A` | GET to the Top! |
+
+The other nine are unmapped. The 130-hour save has all eleven filled (high scores
+880-970), so the table extent is certain.
+
+Note the high score and previous score differ in the completed save (song `0x05`:
+900/880, song `0x08`: 920/840), which is what identifies bits 31-20 as the
+*best* rather than the most recent.
+
+**Why the first scan missed it:** the search assumed byte-aligned `u16` values in
+descending order. A 12-bit field starting at bit 20 is invisible to that, and a
+flat id-indexed table has no ordering to detect. When a value is known to exist
+but a search comes back empty, suspect the *encoding assumption* before
+concluding the data is absent.
+
+Implemented in `client/Ps3Mapi/Karaoke.cs`. `ReadAll` fetches all eleven records
+in a single 44-byte read rather than eleven round trips, which matters on a
+~1.3 MB/s link.
+
+#### What this means for locations
+
+
+
+A location like *"Pure Love in Kamurocho: 90+"* cannot simply read a stored
+per-song best, because none exists. Two consequences:
+
+- **Live detection is sufficient anyway.** Archipelago checks are one-way — once
+  sent they stay sent — so the client only has to *observe* a qualifying score
+  once. A later better run by another song evicting the entry does not un-send
+  the check.
+- **Retroactive detection is limited to what is still on the board.** On
+  reconnect the client can scan the ten entries and award anything it finds, but
+  a score pushed off the board is unrecoverable. Acceptable, given the client
+  polls during play.
+
+#### Four flag bytes also fired
+
+| Save | RAM | Change |
+|---|---|---|
+| `0x001C9F` | `0x01530F6F` | `00` -> `08` |
+| `0x001CBF` | `0x01530F8F` | `00` -> `02` |
+| `0x001D3F` | `0x0153100F` | `00` -> `20` |
+| `0x00349F` | `0x0153276F` | `00` -> `02` |
+
+All are `0x1F mod 0x20` — the same 32-byte-stride sparse table that holds the
+hostess availability flags (`0x001FBF` Erika, `0x00203F` Yuna). So that table is
+general game state, not hostess-specific, and its entries hold **values**, not
+just 0/1. These four are per-song-tracking candidates.
+
+**Next experiment:** sing a *different* song and diff again. That resolves
+whether the leading bytes of a board entry identify the song, and whether the
+four flag bytes are per-song or just "karaoke happened".
+
+## Prototype apworld
+
+`world/yakuza_dead_souls/`, game name **"Yakuza: Dead Souls"**, id base
+`8_960_000`. Generates against the Archipelago **source checkout** at
+`D:\Dev_programs\Archipelago` — use that rather than the ProgramData install,
+which downgrades some generation errors to warnings.
+
+| | |
+|---|---|
+| Locations | 33 = 11 songs x 3 score tiers (800/850/900) |
+| Items | `Erika's Business Card`, `Yuna's Business Card` (progression), `Submachine Gun Ammo` (filler) |
+| Regions | one, `Kamurocho` - every karaoke check is reachable from the start |
+| Option | `start_with_one_card` - precollect a random card so a run has something local to do |
+
+The cards are AP items, not the in-game key items of the same name: receiving one
+tells the client to set that hostess's availability flag
+(`0x0153128F` / `0x0153130F`).
+
+**Packaging:** `custom_worlds` loads **`.apworld` zip files**, not raw folders.
+The zip contains one top-level directory named after the module. A raw directory
+dropped in `custom_worlds` fails with a bare
+`ModuleNotFoundError: No module named 'worlds.yakuza_dead_souls'`, which looks
+like a code fault but is purely a packaging one. `build-apworld.ps1` does the
+zip (and `-Deploy` copies it across) — PowerShell rather than Python, to keep
+this repo's Python confined to the apworld itself.
+
+**Song names are provisional.** Only ids `0x08` (Pure Love in Kamurocho) and
+`0x0A` (GET to the Top!) are confirmed; the rest are `Karaoke Song NN`
+placeholders. Location names go into the datapackage, so renaming them
+invalidates seeds generated beforehand — confirm the real titles before any seed
+is worth keeping.
+
+## Prototype client
+
+`client/ApClient` -> `ydsclient`, C#/.NET 10, referencing
+**Archipelago.MultiClient.Net 6.7.1** and the `Ps3Mapi` library.
+
+```
+ydsclient --slot <name> [--ap <host>] [--port <n>] [--password <pw>] [--host <ps3 ip>]
+```
+
+Startup: resolve the PS3 pid via `Ps3Console.FindGameAsync`, connect PS3MAPI,
+sanity-check the ELF header, then log in to Archipelago with
+`ItemsHandlingFlags.AllItems`.
+
+The loop (2 s tick):
+
+1. `Karaoke.ReadAll` - one 44-byte read for all eleven songs - then send a check
+   for every song/tier whose high score qualifies and has not been sent.
+2. Apply newly received items: hostess cards set the availability flags, filler
+   goes to the inventory.
+3. `KeyItems.AkiyamaHostessesMaxed` -> `session.SetGoalAchieved()` once.
+
+`AllLocationsChecked` is read at startup and seeded into the sent-set, so a
+reconnect does not resend everything.
+
+`EnforceGates()` runs once at connect and writes **both** availability flags from
+what the server says was received — so a hostess the player has not been granted
+is actively re-locked, rather than only being left alone.
+
+### Known fragility: the ids are duplicated
+
+Location and item ids exist in two places with nothing enforcing agreement:
+
+| | |
+|---|---|
+| `world/yakuza_dead_souls/Locations.py` | `BASE_ID + song*10 + tierIndex` |
+| `client/ApClient/ApIds.cs` | `BaseId + songId*MaxTiersPerSong + tierIndex` |
+
+Same for the three item ids and for `SCORE_TIERS` / `Karaoke.ScoreTiers`. Change
+one side and the client silently desyncs from generated seeds — checks land on
+the wrong locations rather than erroring. Generating the C# side from the `.py`
+(or both from `data/`) is the obvious fix and is not done.
+
+### The storage box: 133 slots, and it stacks
+
+Bounded from the 130-hour save (storage save offset `0x005BD4`, RAM
+`0x01534EA4`):
+
+- **133 slots occupied contiguously**, no gaps, ending at RAM `0x015352CC`.
+- The key-item array's valid range does not begin until `0x0153540C`, leaving
+  room for ~40 more slots the game has never been seen to use. `StorageSlots`
+  is set to the proven 133 rather than the structurally-possible 173.
+- Same 8-byte record as the player inventory: `[u16 id][u16 pad][u32 quantity]`.
+
+**Storage stacks; the player inventory does not.** The completed save holds
+`Submachine Gun Ammo` x2591, `Rifle Ammo` x2373, `Gatling Gun Ammo` x1215 — all
+in single slots. That settles a question left open since the Tauriner
+experiments, where three of the same item took three separate *inventory* slots.
+So the quantity field is real, it is just the inventory that refuses to merge.
+
+Added to `Inventory`:
+
+| Method | Behaviour |
+|---|---|
+| `FindStorageSlot(game, id)` | an existing stack of that item, else the first empty slot |
+| `GrantToStorage(game, id, qty)` | adds to an existing stack, or starts a new one |
+| `GrantAnywhere(game, id, qty)` | player inventory first, storage as overflow |
+
+The AP client uses `GrantAnywhere` for filler, so a full 24-slot inventory sends
+ammo to the box instead of discarding it.
+
 ### Lead: the Completion List is a location source
 
 This build has a **completion list** with rewards collected from Bob B once he

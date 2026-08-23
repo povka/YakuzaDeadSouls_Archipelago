@@ -52,6 +52,20 @@ foreach (var (id, who) in new (ushort, string)[]
     Console.WriteLine($"  {who}  {(KeyItems.Has(game, id) ? "yes" : "-")}   0x{KeyItems.AddressOf(id):X8}");
 Console.WriteLine($"  => goal complete: {KeyItems.AkiyamaHostessesMaxed(game)}");
 
+Console.WriteLine($"\nkaraoke (tiers {string.Join("/", Karaoke.ScoreTiers)}):");
+var songs = Karaoke.ReadAll(game);
+var checksEarned = 0;
+foreach (var song in songs)
+{
+    if (!song.EverSung) continue;
+    var tiers = Karaoke.ClearedTiers(song).ToArray();
+    checksEarned += tiers.Length;
+    Console.WriteLine($"  song 0x{song.Id:X2}  high {song.HighScore,4}  prev {song.PreviousScore,4}   "
+                      + (tiers.Length > 0 ? $"checks: {string.Join(", ", tiers)}" : "no tier reached"));
+}
+Console.WriteLine($"  {songs.Count(s => s.EverSung)}/{Karaoke.SongCount} songs sung, "
+                  + $"{checksEarned}/{Karaoke.SongCount * Karaoke.ScoreTiers.Length} karaoke checks earned");
+
 Console.WriteLine("\ninventory:");
 var items = Inventory.Read(game);
 for (var i = 0; i < items.Length; i++)

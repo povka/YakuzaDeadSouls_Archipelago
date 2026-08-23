@@ -148,10 +148,15 @@ public static class Inventory
     }
 
     // Same 8-byte record format, immediately after the 24 inventory slots.
-    // Extent not yet bounded.
+    // A 130-hour save fills slots 0-132 contiguously, so at least this many are
+    // real; the key-item array does not begin until 0x0153540C, leaving room for
+    // ~40 more that the game has never been observed to use.
     public const uint StorageBase = 0x01534EA4;
+    public const int StorageSlots = 133;
 
-    public static Item[] ReadStorage(GameProcess game, int slots = 24)
+    // Unlike the player inventory, storage stacks: the same save holds 2591
+    // Submachine Gun Ammo in one slot.
+    public static Item[] ReadStorage(GameProcess game, int slots = StorageSlots)
     {
         var raw = game.Read(StorageBase, slots * Stride);
         var items = new Item[slots];
@@ -172,4 +177,34 @@ public static class Inventory
         game.Write(slot.Value, MakeRecord(itemId, quantity));
         return slot;
     }
+
+    public static uint? FindStorageSlot(GameProcess game, ushort itemId)
+    {
+        var items = ReadStorage(game);
+        for (var i = 0; i < items.Length; i++)
+            if (items[i].Id == itemId)
+                return StorageBase + (uint)(i * Stride);
+        for (var i = 0; i < items.Length; i++)
+            if (items[i].IsEmpty)
+                return StorageBase + (uint)(i * Stride);
+        return null;
+    }
+
+    public static uint? GrantToStorage(GameProcess game, ushort itemId, uint quantity = 1)
+    {
+        var slot = FindStorageSlot(game, itemId);
+        if (slot is null) return null;
+
+        var existing = game.Read(slot.Value, Stride);
+        var held = BinaryPrimitives.ReadUInt16BigEndian(existing) == itemId
+            ? BinaryPrimitives.ReadUInt32BigEndian(existing.AsSpan(4))
+            : 0;
+
+        game.Write(slot.Value, MakeRecord(itemId, held + quantity));
+        return slot;
+    }
+
+    // Player inventory first, storage box as overflow.
+    public static uint? GrantAnywhere(GameProcess game, ushort itemId, uint quantity = 1) =>
+        Grant(game, itemId, quantity) ?? GrantToStorage(game, itemId, quantity);
 }
