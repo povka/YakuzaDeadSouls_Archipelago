@@ -1277,10 +1277,12 @@ Known song ids:
 
 | Id | Song |
 |---|---|
+| `0x02` | Where Has Your Touch Gone? |
 | `0x08` | Pure Love in Kamurocho |
+| `0x09` | Raindrops |
 | `0x0A` | GET to the Top! |
 
-The other nine are unmapped. The 130-hour save has all eleven filled (high scores
+The other seven are unmapped. The 130-hour save has all eleven filled (high scores
 880-970), so the table extent is certain.
 
 Note the high score and previous score differ in the completed save (song `0x05`:

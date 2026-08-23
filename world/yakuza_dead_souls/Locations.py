@@ -12,14 +12,14 @@ BASE_ID = 8_960_000
 SONG_NAMES: dict[int, str] = {
     0x00: "Karaoke Song 00",
     0x01: "Karaoke Song 01",
-    0x02: "Karaoke Song 02",
+    0x02: "Where Has Your Touch Gone?",
     0x03: "Karaoke Song 03",
     0x04: "Karaoke Song 04",
     0x05: "Karaoke Song 05",
     0x06: "Karaoke Song 06",
     0x07: "Karaoke Song 07",
     0x08: "Pure Love in Kamurocho",
-    0x09: "Karaoke Song 09",
+    0x09: "Raindrops",
     0x0A: "GET to the Top!",
 }
 
