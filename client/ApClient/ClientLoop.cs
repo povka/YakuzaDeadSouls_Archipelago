@@ -5,13 +5,39 @@ using YakuzaDeadSouls.Ps3;
 
 namespace YakuzaDeadSouls.ApClient;
 
-public sealed class ClientLoop(GameProcess game, ArchipelagoSession session)
+public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, string slot)
 {
     private readonly HashSet<long> _sent = [];
     private int _itemsApplied;
     private bool _goalSent;
+    private int _consecutiveFailures;
+    private string? _statePath;
 
     public int PollMilliseconds { get; init; } = 2000;
+
+    // The server resends every item on connect, so "how many have I already
+    // put into the game" has to survive a client restart. Locations do not
+    // need this - the server tracks those itself.
+    private string StatePath
+    {
+        get
+        {
+            if (_statePath is not null) return _statePath;
+            var seed = session.RoomState?.Seed ?? "noseed";
+            var key = string.Concat($"{seed}_{slot}".Select(c => char.IsLetterOrDigit(c) ? c : '_'));
+            var dir = Path.Combine(AppContext.BaseDirectory, "apstate");
+            Directory.CreateDirectory(dir);
+            return _statePath = Path.Combine(dir, $"{key}.txt");
+        }
+    }
+
+    private void LoadApplied()
+    {
+        if (File.Exists(StatePath) && int.TryParse(File.ReadAllText(StatePath), out var n))
+            _itemsApplied = n;
+    }
+
+    private void SaveApplied() => File.WriteAllText(StatePath, _itemsApplied.ToString());
 
     public async Task RunAsync(CancellationToken cancel)
     {
@@ -19,17 +45,26 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session)
 
         foreach (var id in session.Locations.AllLocationsChecked)
             _sent.Add(id);
+        LoadApplied();
         Console.WriteLine($"  {_sent.Count} location(s) already checked on the server");
+        Console.WriteLine($"  {_itemsApplied} item(s) already applied to this save");
 
         while (!cancel.IsCancellationRequested)
         {
+            // The console refuses a data connection now and then, usually during
+            // a heavy scene. Nothing here is worth killing the client over -
+            // log it and try again on the next tick.
             try
             {
                 await PollAsync();
+                _consecutiveFailures = 0;
             }
-            catch (Ps3Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Console.WriteLine($"  ps3: {ex.Message}");
+                _consecutiveFailures++;
+                var reason = (ex as AggregateException)?.InnerException?.Message ?? ex.Message;
+                if (_consecutiveFailures <= 3 || _consecutiveFailures % 10 == 0)
+                    Console.WriteLine($"  ps3: {reason} (failure {_consecutiveFailures})");
             }
 
             try { await Task.Delay(PollMilliseconds, cancel); }
@@ -77,8 +112,9 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session)
             var item = received[i];
             Console.WriteLine($"  received: {item.ItemName}");
             Apply(item.ItemId);
+            _itemsApplied = i + 1;
+            SaveApplied();
         }
-        _itemsApplied = received.Count;
     }
 
     private void Apply(long itemId)

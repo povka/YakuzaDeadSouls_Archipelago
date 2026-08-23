@@ -33,12 +33,20 @@ public static class KeyItems
     public static void Grant(GameProcess game, ushort itemId, uint quantity = 1) =>
         game.Write(AddressOf(itemId), Inventory.MakeRecord(itemId, quantity));
 
+    private static bool OwnedIn(byte[] window, uint windowBase, ushort itemId)
+    {
+        var at = (int)(AddressOf(itemId) - windowBase);
+        return BinaryPrimitives.ReadUInt16BigEndian(window.AsSpan(at, 2)) == itemId
+               && BinaryPrimitives.ReadUInt32BigEndian(window.AsSpan(at + 4, 4)) > 0;
+    }
+
+    // Both fancy cards sit 16 bytes apart, so one read answers this instead of
+    // two round trips. The client polls it every tick over a ~1.3 MB/s link.
     public static bool AkiyamaHostessesMaxed(GameProcess game)
     {
-        if(Has(game, YunaFancyCard) && Has(game, ErikaFancyCard))
-        {
-            return true;
-        }
-        return false;
+        var from = AddressOf(YunaFancyCard);
+        var length = (int)(AddressOf(ErikaFancyCard) + Stride - from);
+        var window = game.Read(from, length);
+        return OwnedIn(window, from, YunaFancyCard) && OwnedIn(window, from, ErikaFancyCard);
     }
 }

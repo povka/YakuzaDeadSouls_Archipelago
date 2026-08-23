@@ -1391,6 +1391,78 @@ reconnect does not resend everything.
 what the server says was received — so a hostess the player has not been granted
 is actively re-locked, rather than only being left alone.
 
+### End-to-end test: it works
+
+Full loop verified against a real seed, a local `MultiServer`, and the console.
+
+Seed placed `Erika's Business Card` on *Karaoke Song 03: 850+* and
+`Yuna's Business Card` on *Karaoke Song 04: 900+*. Poking those two songs'
+scores to 860 and 910 produced:
+
+```
+check: song 0x03 @ 800+     check: song 0x04 @ 800+
+check: song 0x03 @ 850+     check: song 0x04 @ 850+
+                            check: song 0x04 @ 900+
+received: Erika's Business Card     received: Submachine Gun Ammo  x3
+received: Yuna's Business Card
+```
+
+Verified on the console afterwards: both hostess flags set to `01`, and three
+inventory slots holding id 29 at quantity 200. **Quantity works in the player
+inventory too** — the game shows them as separate slots because it will not
+merge stacks, but the count field is honoured.
+
+#### Bug found and fixed: filler duplicated on every reconnect
+
+The server resends the entire received-items list on connect, and
+`_itemsApplied` was in-memory only, so each client start re-granted everything.
+Flags are idempotent so the cards were harmless, but ammo accumulated 3 slots
+per restart — confirmed by restarting against the same server and watching the
+count go 3 -> 6.
+
+Fixed by persisting the applied count to
+`apstate/<seed>_<slot>.txt` next to the executable, written after **each** item
+rather than once per batch, so a crash mid-batch cannot lose or repeat one.
+Keying on the seed means a new multiworld starts from zero.
+
+Locations never needed this: `session.Locations.AllLocationsChecked` is read at
+startup and the server is authoritative. Only item *application* is a local
+side effect, and only local state can track it.
+
+### Crash: PASV data connections get refused under load
+
+The client died with an unhandled `SocketException (10061)` while the player was
+starting a karaoke song for the second time:
+
+```
+No connection could be made because the target machine actively refused it.
+  at Ps3MapiClient.OpenDataConnection()
+  at KeyItems.Has(...)  <- CheckGoal, every tick
+```
+
+**Cause.** PS3MAPI is FTP-shaped: every `MEMORY GET` opens a *fresh PASV data
+connection*. The console refuses one now and then when it is busy — a heavy
+scene, or several reads in quick succession. The old poll made 3+ data
+connections every 2 s (one for the karaoke table, two for the goal check).
+
+Three fixes:
+
+1. **The loop no longer dies.** It caught only `Ps3Exception`, so a raw
+   `SocketException` escaped and killed the process. It now catches everything
+   except cancellation, logs, and retries next tick — with repeat-suppression so
+   a disconnected console does not spam the console. A transport hiccup must
+   never end a multiworld session.
+2. **`OpenDataConnection` retries** (3 attempts, 150/300 ms backoff) and wraps
+   socket failures in `Ps3Exception` so callers see one exception type instead of
+   raw `SocketException` / `AggregateException`.
+3. **The goal check is one read instead of two.** Both fancy-card records sit 16
+   bytes apart, so `AkiyamaHostessesMaxed` reads a single 24-byte window and
+   decodes both. Halves the per-tick connections.
+
+**Design note for anything added later:** on this transport, *reads are not
+free — connections are*. Prefer one wide read over several narrow ones even when
+the extra bytes are wasted; 44 bytes in one connection beats 8 bytes in three.
+
 ### Known fragility: the ids are duplicated
 
 Location and item ids exist in two places with nothing enforcing agreement:

@@ -3,29 +3,33 @@ using Archipelago.MultiClient.Net.Enums;
 using YakuzaDeadSouls.ApClient;
 using YakuzaDeadSouls.Ps3;
 
-if (args.Contains("--help") || args.Length == 0) { Usage(); return 0; }
+if (args.Contains("--help")) { Usage(); return 0; }
 
-var apHost = Opt("--ap") ?? "archipelago.gg";
-var apPort = int.TryParse(Opt("--port"), out var p) ? p : 38281;
-var slot = Opt("--slot");
-var password = Opt("--password");
+// No arguments means it was double-clicked, so ask instead of exiting.
+var interactive = args.Length == 0;
+
+var apHost = Opt("--ap") ?? (interactive ? Ask("Archipelago server", "archipelago.gg") : "archipelago.gg");
+var apPort = int.TryParse(Opt("--port") ?? (interactive ? Ask("Port", "38281") : null), out var p) ? p : 38281;
+var slot = Opt("--slot") ?? (interactive ? Ask("Slot name", null) : null);
+var password = Opt("--password") ?? (interactive ? NullIfBlank(Ask("Password (blank for none)", "")) : null);
 var ps3Host = Ps3Config.Resolve(Opt("--host"));
 
-if (slot is null) { Console.WriteLine("--slot is required"); return 1; }
-if (ps3Host is null) { Console.WriteLine(Ps3Config.HelpText); return 1; }
+if (interactive) Console.WriteLine();
+if (string.IsNullOrWhiteSpace(slot)) { Console.WriteLine("A slot name is required."); return Finish(1); }
+if (ps3Host is null) { Console.WriteLine(Ps3Config.HelpText); return Finish(1); }
 
 Console.WriteLine($"ps3   {ps3Host}");
 uint? pid;
 try { pid = await Ps3Console.FindGameAsync(ps3Host); }
-catch (Ps3Exception ex) { Console.WriteLine($"  {ex.Message}"); return 1; }
-if (pid is null) { Console.WriteLine("  no game running on the console"); return 1; }
+catch (Ps3Exception ex) { Console.WriteLine($"  {ex.Message}"); return Finish(1); }
+if (pid is null) { Console.WriteLine("  no game running on the console"); return Finish(1); }
 
 using var ps3 = new Ps3MapiClient(ps3Host);
 ps3.Connect();
 var game = new GameProcess(ps3, pid.Value);
 Console.WriteLine($"  attached pid 0x{pid:X8}");
 
-if (!game.LooksLikeGame()) { Console.WriteLine("  no ELF header - wrong process?"); return 1; }
+if (!game.LooksLikeGame()) { Console.WriteLine("  no ELF header - wrong process?"); return Finish(1); }
 
 Console.WriteLine($"\nap    {apHost}:{apPort} as '{slot}'");
 var session = ArchipelagoSessionFactory.CreateSession(apHost, apPort);
@@ -36,11 +40,11 @@ if (login is LoginFailure failure)
 {
     Console.WriteLine("  login failed:");
     foreach (var e in failure.Errors) Console.WriteLine($"    {e}");
-    return 1;
+    return Finish(1);
 }
 Console.WriteLine("  connected");
 
-var loop = new ClientLoop(game, session);
+var loop = new ClientLoop(game, session, slot);
 loop.EnforceGates();
 
 using var cancel = new CancellationTokenSource();
@@ -50,7 +54,28 @@ Console.WriteLine("\nwatching. ctrl-c to stop.\n");
 await loop.RunAsync(cancel.Token);
 session.Socket.DisconnectAsync().GetAwaiter().GetResult();
 Console.WriteLine("\ndisconnected.");
-return 0;
+return Finish(0);
+
+string Ask(string prompt, string? fallback)
+{
+    Console.Write(fallback is { Length: > 0 } ? $"{prompt} [{fallback}]: " : $"{prompt}: ");
+    var line = Console.ReadLine();
+    return string.IsNullOrWhiteSpace(line) ? fallback ?? "" : line.Trim();
+}
+
+string? NullIfBlank(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+// Keeps a double-clicked window open long enough to read the message.
+int Finish(int code)
+{
+    if (interactive)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Press Enter to close.");
+        Console.ReadLine();
+    }
+    return code;
+}
 
 string? Opt(string name)
 {

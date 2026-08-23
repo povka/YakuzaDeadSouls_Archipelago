@@ -131,6 +131,20 @@ public sealed class Ps3MapiClient : IDisposable
         _binary = true;
     }
 
+    public int DataConnectionRetries { get; set; } = 3;
+
+    private TcpClient OpenDataConnectionWithRetry()
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try { return OpenDataConnection(); }
+            catch (Ps3Exception) when (attempt < DataConnectionRetries)
+            {
+                Thread.Sleep(150 * attempt);
+            }
+        }
+    }
+
     private TcpClient OpenDataConnection()
     {
         Send("PASV");
@@ -150,9 +164,21 @@ public sealed class Ps3MapiClient : IDisposable
         if (host == "0.0.0.0") host = _host;
         var port = nums[4] * 256 + nums[5];
 
+        // The console refuses the occasional PASV connection when it is busy -
+        // a heavy scene, or several reads in quick succession. Refusal is
+        // transient, so retry rather than surfacing a raw SocketException.
         var data = new TcpClient();
-        if (!data.ConnectAsync(IPAddress.Parse(host), port).Wait(5000))
-            throw new Ps3Exception($"timed out opening PASV data connection to {host}:{port}");
+        try
+        {
+            if (!data.ConnectAsync(IPAddress.Parse(host), port).Wait(5000))
+                throw new Ps3Exception($"timed out opening PASV data connection to {host}:{port}");
+        }
+        catch (Exception ex) when (ex is not Ps3Exception)
+        {
+            data.Dispose();
+            var reason = (ex as AggregateException)?.InnerException?.Message ?? ex.Message;
+            throw new Ps3Exception($"PASV data connection to {host}:{port} refused: {reason}");
+        }
         data.GetStream().ReadTimeout = 15000;
         data.GetStream().WriteTimeout = 15000;
         return data;
@@ -169,7 +195,7 @@ public sealed class Ps3MapiClient : IDisposable
             var want = Math.Min(MaxRead, size - written);
             var at = address + (uint)written;
 
-            using var data = OpenDataConnection();
+            using var data = OpenDataConnectionWithRetry();
             Send($"MEMORY GET {pid} {at:X8} {want}");
             Await(125, 150);
 
