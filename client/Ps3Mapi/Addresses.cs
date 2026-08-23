@@ -27,7 +27,7 @@ public static class Addresses
     public const uint Exp = 0x0154BDCC;         // progress within the current level
     public const uint ExpTotal = 0x0154BDC8;    // cumulative; does not drive the display
     public const uint Level = 0x0154BDC4;       // u8
-    public const uint AbilityPoints = 0x0154BDD6;  // u8
+    public const uint SoulPoints = 0x0154BDD6;     // u8
     public const uint AmmoDisplay = 0x01536731; // HUD only; not what the gun fires
     public const uint StatsBase = 0x0154BDB0;
 }
@@ -138,6 +138,24 @@ public static class Inventory
             if (items[i].IsEmpty)
                 return Base + (uint)(i * Stride);
         return null;
+    }
+
+    // Same 8-byte record format, immediately after the 24 inventory slots.
+    // Extent not yet bounded.
+    public const uint StorageBase = 0x01534EA4;
+
+    public static Item[] ReadStorage(GameProcess game, int slots = 24)
+    {
+        var raw = game.Read(StorageBase, slots * Stride);
+        var items = new Item[slots];
+        for (var i = 0; i < slots; i++)
+        {
+            var span = raw.AsSpan(i * Stride, Stride);
+            items[i] = new Item(
+                BinaryPrimitives.ReadUInt16BigEndian(span[..2]),
+                BinaryPrimitives.ReadUInt32BigEndian(span[4..8]));
+        }
+        return items;
     }
 
     public static uint? Grant(GameProcess game, ushort itemId, uint quantity = 1)

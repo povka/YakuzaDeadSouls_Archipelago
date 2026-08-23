@@ -578,7 +578,7 @@ recorded at level 1 was partly wrong.
 | +0x14 | `0x0154BDC4` | u8 | **Level** |
 | +0x18 | `0x0154BDC8` | u32 | EXP **total**, cumulative |
 | +0x1C | `0x0154BDCC` | u32 | EXP **within the current level** |
-| +0x26 | `0x0154BDD6` | u8 | **Ability points** |
+| +0x26 | `0x0154BDD6` | u8 | **Soul points** |
 
 Note the struct mixes widths freely — HP is a `u16` pair and Focus is an `f32`
 pair four bytes later. Reading either with the wrong accessor returns a
@@ -623,6 +623,368 @@ current EXP and total EXP, all of which are read directly, and omits
 
 If the threshold is ever needed, the way in is a breakpoint on the level-up
 routine in RPCS3, not a memory search.
+
+### Player outfits: the selector is in the hideout
+
+The models exist in the EU build (`c_am_akiyama_mafia`, `_homeless`, `_narikin`,
+`c_am_kiryu_american`, `b0_c_ak_haruka_devil` — see the game-files section).
+
+**The selector is in the hideout, and the whole path is post-game.** The full
+sequence, confirmed:
+
+1. Beat the game, then **create Game Clear Data at the laptop on the desk in the
+   Prosthesis Shop**.
+2. Load that save into **Premium Adventure**.
+3. In a hideout (Kamiyama's van or the Prosthesis Shop), select **"Change
+   Outfit"**, move a character from **"Basic"** to **"Change"**, pick from the list.
+
+Note the shape of the gate: it is not one flag on the running game, it is a
+**distinct save type**. The laptop writes Game Clear Data, and Premium Adventure
+is a separate load path for it. Flipping a byte in a chapter-3 session will not
+reproduce that.
+
+Each character has four outfits; the fourth is **Patriot Pack** DLC:
+
+| Character | 2nd | 3rd | 4th (DLC) |
+|---|---|---|---|
+| Akiyama | Homeless (Y4) | Hipster (Y4/5) | **Gangster** |
+| Majima | Chairman (Y3/4) | Shirtless | Pirate |
+| Ryuji | Takoyaki Chef | Samurai | Bandolier |
+| Kiryu | Ryukyu (Y3) | Dragon Mask (Y3) | **Americana** |
+
+That maps cleanly onto the model names found in `chara.par`:
+`c_am_akiyama_homeless` → Homeless, `_narikin` (成金, "nouveau riche") → Hipster,
+`_mafia` → **Gangster, the DLC one**, and `c_am_kiryu_american` → **Americana,
+also DLC**. Both Patriot Pack models being present in this EU build means the
+DLC content ships on-disc or the pack is already installed.
+
+**Bob Utsunomiya is not the outfit source.** Correcting the earlier note: Bob A
+runs *challenges* (Endless Subterranea, Extreme Chase Challenge, Kamurocho
+Survival Gauntlet) and Bob B hands out *completion rewards* plus, with the
+Patriot Pack, *Apocalypse Fun Packs*. Both are Premium Adventure. Unrelated to
+outfits — but see the location note below, because they matter for a different
+reason.
+
+Consequences for finding the outfit selector:
+
+- **No in-game outfit change to diff.** The method that found money, EXP, the
+  inventory, Focus and all 39 abilities needs the player to trigger the change,
+  and that is unreachable before completing the game.
+- **Outfits are not inventory items.** Nothing outfit-shaped exists anywhere in
+  `data/items.tsv` outside the hostess-club block at 362-420. Bob's outfits use
+  a separate unlock/equip system.
+- **The model name is not in the data segment.** Searching for `c_am_akiyama`,
+  `mafia`, `narikin` and `.gmd` found nothing. What *is* there at `0x0137B178`
+  is a **preload manifest** of `.par` archive names in 64-byte entries — it even
+  lists `c_am_saejima.par` and `c_am_tanimura.par` from Yakuza 4, so it is a
+  generic asset list, not the current outfit.
+
+**PARKED. Cost/benefit says stop here.** Reaching the selector requires either a
+full playthrough or an externally sourced Game Clear save, and the payoff is one
+filler-check type. Every other open item on this list is cheaper. Revisit if a
+completed save turns up for another reason — see below, because one would unblock
+considerably more than outfits.
+
+### Strategic option: obtain a completed save
+
+A high-completion PAL save has been obtained. Contents:
+
+| Folder | SUB_TITLE | DETAIL |
+|---|---|---|
+| `BLES01399F` | System data | global/system data, 2048 B `USERDATA` |
+| `BLES01399L01` | Save data 01 | **Premium Free Adventure (Kiryu)**, 130:46:12 |
+| `BLES01399L05` | Save data 05 | **Clear Data**, 130:50:41, difficulty EASY |
+
+`L01` is the valuable one — it is a save *already inside Premium Adventure*, so
+it should reach the hideout outfit menu without going through the laptop step.
+`L05` is the Clear Data that produces Premium Adventure the intended way.
+
+Two facts that constrain how it can be used:
+
+- **The title ID is `BLES01399`** (PAL disc), while this project's game is
+  `NPEB02034` (EU PSN digital). Whether they share a savedata directory is
+  **unverified** and is the blocking question — resolve it by looking at what
+  folder the console's own Dead Souls save already occupies.
+- **`USER01` is encrypted.** Entropy 8.00/8, longest identical-byte run 3,
+  zero-byte frequency 0.4% (= 1/256). Indistinguishable from random. So there is
+  **no offline save diffing** — a completed and a chapter-3 save cannot be
+  compared byte-wise to extract flags. All flag discovery stays live-memory.
+- The `ACCOUNT_ID` is the original owner's, so console use requires resigning
+  (Apollo Save Tool runs on-console and does this; Bruteforce Save Data is the
+  PC equivalent).
+
+**Correction to an earlier claim in this file:** "RPCS3 needs no save signing" was
+stated too confidently. RPCS3 stores savedata in its own form and it is not
+established that it accepts a real encrypted PS3 save unmodified. Verify before
+relying on it. The console path — resign and load — is the better-trodden one,
+and the console is the ship target anyway.
+
+Back up the existing chapter-3 save before any of this; it is the only copy of
+the state behind the 39 mapped ability bits.
+
+### Importing a foreign save: what actually has to change
+
+`client/SfoTool` (`ydssfo`) parses PARAM.SFO and patches string fields in place.
+`dump` prints every key with its format and size; `retarget <folder> <name> <id>`
+rewrites `SAVEDATA_DIRECTORY` and `ACCOUNT_ID` and renames the folder to match,
+so the two can never drift apart.
+
+PARAM.SFO layout (little-endian, unlike everything else on this console): magic
+`\0PSF`, then key-table and data-table offsets and an entry count at 0x08/0x0C/
+0x10, then 16-byte index entries from 0x14 — `u16 keyOffset, u16 format,
+u32 length, u32 maxLength, u32 dataOffset`.
+
+Three string formats matter:
+
+| Format | Meaning | Example |
+|---|---|---|
+| `0x0204` | UTF-8, null-terminated | `SAVEDATA_DIRECTORY`, max 64 |
+| `0x0004` | UTF-8, **not** terminated | `ACCOUNT_ID`, max 16, zero slack |
+| `0x0404` | u32 | `ATTRIBUTE` |
+
+The `0x0004` / `0x0204` split is why the length guard uses `needed > max` rather
+than `>=`: `ACCOUNT_ID` legitimately fills its field exactly, while a `0x0204`
+value must leave room for its terminator.
+
+What a rename does **not** fix:
+
+- **`PARAM.PFD`** still holds the original signature and per-file hashes. The
+  game rejects the save until it is resigned. Apollo Save Tool does this
+  on-console.
+- **The `PARAMS` blob** (`0x0004`, 1024 bytes) embeds the account ID a second
+  time. After retargeting, the old ID still appears once per PARAM.SFO. Whether
+  the game cares is untested; the resigner is expected to handle it.
+- `SUB_TITLE` still reads "Save data 01" for a save now living in slot 4.
+  Cosmetic, and the game likely rewrites it on next save.
+
+Concrete state for this project: the PAL saves were renamed to `NPEB02034L04`
+(Premium Adventure) and `NPEB02034L05` (Clear Data) — slots the console had free,
+so no existing save is at risk — and retargeted to account `1d0d430cf4cbfc3f`.
+`BLES01399F` was deliberately not imported; the console's own `NPEB02034F` system
+data is left alone.
+
+Console save slots in use before the import: `L01` (Part I Chapter 2, 0:02:20),
+`L02`, `L03`. The real working save is L02 or L03, not L01.
+
+**Still unverified and the thing most likely to break this:** savedata is
+encrypted with a game-declared `SECURE_FILE_ID`. If the PAL disc build
+(`BLES01399`) and the EU digital build (`NPEB02034`) declare different ones, the
+game cannot decrypt the imported save at all, and no amount of resigning helps.
+Only an empirical load test answers it.
+
+### Apollo cannot resign NPEB02034 out of the box
+
+Resigning the imported saves failed with *"Error! Save NPEB02034 couldn't be
+resigned"*. Cause found by reading the Apollo source
+(`bucanero-apollo-ps3`, `source/exec_cmd.c:1317`):
+
+```c
+if (!pfd_util_init((u8*) apollo_config.idps, apollo_config.user_id,
+                   entry->title_id, entry->path) ||
+    (pfd_util_process(PFD_CMD_UPDATE, 0) != SUCCESS))
+    show_message(_("Error! Save %s couldn't be resigned"), entry->title_id);
+```
+
+`pfd_util_init` looks the title ID up in a key database
+(`/dev_hdd0/game/NP0APOLLO/USRDIR/DATA/games.conf`, 1818 sections) via
+`find_game_keys`, which does `strstr(game->game_ids, game_id)` against the INI
+**section name**. The Dead Souls section is:
+
+```ini
+; "YAKUZA 4 Dead Souls / Ryu ga Gotoku of the End"
+[BLUS30826/BLES01399/BLJM60316/BLJM55054/BLAS50310]
+;disc_hash_key=
+secure_file_id:*=908AA7013F9B2D0088E1CB98159101D2
+```
+
+`BLES01399` is present; **`NPEB02034` is not**. Apollo derives the title ID from
+the save folder name, so renaming the import to `NPEB02034L04` is exactly what
+broke the lookup — with no match it falls back to a generic disc hash key and an
+empty `secure_file_ids` list, and the PFD update fails.
+
+Note the failure is *not* caused by hand-editing PARAM.SFO after signing:
+`apply_sfo_patches` runs earlier at line 1309 and has its own distinct message
+("Account changes couldn't be applied"), which did not appear.
+
+**Fix:** append `/NPEB02034` to that section name. Because matching is `strstr`
+over the whole section string, one edit covers it.
+
+**Incidental and important:** the same `secure_file_id`
+`908AA7013F9B2D0088E1CB98159101D2` is shared by Yakuza 4, Dead Souls, and the
+neighbouring RGG section. SEGA reused one key across these titles, which is
+strong evidence the digital `NPEB02034` build uses it too — so the earlier worry
+that disc and digital might declare different `SECURE_FILE_ID`s is very likely
+unfounded.
+
+**Also worth knowing:** Apollo exposes `PFD_CMD_DECRYPT` (`pfd_util.c:269`) and
+the UI offers "Export decrypted save files". If that works, `USER01` can be
+decrypted on-console, which would **reopen offline save diffing** — the technique
+ruled out earlier when the payload measured as pure entropy. A completed save
+diffed against a chapter-3 save would surface completion, chapter and substory
+flags at disk speed instead of via 4-second console sweeps. Untested.
+
+### `SAVEDATA_LIST_PARAM` marks Clear Data
+
+Comparing the three saves on the console after import:
+
+| Folder | `SAVEDATA_LIST_PARAM` | `SUB_TITLE` |
+|---|---|---|
+| `NPEB02034L02` (own, chapter 2) | `NORMAL` | Save data 02 |
+| `NPEB02034L04` (Premium Adventure) | `NORMAL` | Save data 01 → fixed to 04 |
+| `NPEB02034L05` (Clear Data) | **`CLEAR`** | Save data 05 |
+
+So the game distinguishes Clear Data with a plaintext PARAM.SFO field, not
+something buried in the encrypted payload. A `CLEAR` save does **not** appear in
+the normal Load Game list — it is offered at the title screen under Premium
+Adventure / Premium New Game. "Slot 5 is missing in-game" was expected behaviour,
+not a failed import.
+
+`SUB_TITLE` is not rewritten by a folder rename, so an imported save keeps the
+slot label it had on the source console. `BLES01399L01` moved into
+`NPEB02034L04` still read "Save data 01", colliding with the console's own L01 in
+Apollo's list — Apollo displays the SFO `TITLE`, which is identical for every
+save of the same game, so the two were indistinguishable. Patch `SUB_TITLE` to
+match the new slot.
+
+Apollo's enumeration (`saves.c:1721 read_savegames`) applies no filtering beyond
+requiring a readable `PARAM.SFO`; it sets `SAVE_FLAG_LOCKED` from `ATTRIBUTE` and
+`SAVE_FLAG_OWNER` when `ACCOUNT_ID` matches the current user. It derives the
+title ID as `"%.9s"` of the directory name (`saves.c:1784`) — which is precisely
+why renaming the folder to `NPEB02034L04` moved it outside the `games.conf` key
+database.
+
+**Order of operations matters:** any PARAM.SFO edit invalidates the hash stored
+for it in PARAM.PFD, so always patch the SFO *first* and resign *afterwards*.
+
+### SOLVED: saves can be decrypted, offline diffing works
+
+Apollo's **"Decrypt save game files"** (`exec_cmd.c:1488 decryptSaveFile`) writes
+plaintext to `/dev_hdd0/tmp/apollo/<dir_name>/`, which webMAN then serves over
+HTTP. The key comes from `get_secure_file_id(entry->title_id, filename)` — i.e.
+the `games.conf` entry.
+
+**This retracts the earlier "no offline save diffing" conclusion.** That was based
+on measuring the *encrypted* `USER01` and finding pure entropy, which was correct
+about the file but wrong about what was possible.
+
+Verification that the added key is right, using the console's own save as a
+control:
+
+| File | Entropy | Zeros | Longest run |
+|---|---|---|---|
+| `USER01` encrypted | 8.00/8 | 0.4% | 3 |
+| `L02` decrypted (own save) | **0.32/8** | 96.2% | 32780 |
+| `L04` decrypted (imported) | **0.59/8** | 94.1% | 32244 |
+
+The console's own save decrypting cleanly proves `908AA7013F9B2D0088E1CB98159101D2`
+is correct for `NPEB02034`, so the disc and digital builds do share SEGA's secure
+file ID as predicted.
+
+#### Save layout, first findings
+
+Header, big-endian like everything else in this game:
+
+| Offset | L02 (ch.2, 1:51:38) | L04 (130:46:12) | Meaning |
+|---|---|---|---|
+| `0x00` | `00000003` | `00000003` | format version, identical |
+| `0x04` | `00000002` | `00000002` | identical, purpose unknown |
+| `0x08` | `00062242` | `01AF01C7` | **play time in frames @60fps** |
+| `0x3C` | `00000000` | `00000001` | differs; candidate mode/clear flag |
+
+Play time confirmed on both samples: 1:51:38 x 60 = 401,880 vs 402,498; and
+130:46:12 x 60 = 28,246,320 vs 28,246,471. Both within seconds.
+
+Because `0x00`/`0x04` match, the imported save is **not** a format-version
+mismatch — that theory is dead as an explanation for the game not listing it.
+
+#### Diff surface
+
+- File size 151,680 bytes; **live data ends around `0x1D28B`** (~119 KB), the rest
+  is zero padding.
+- Only **4,975 bytes differ (3.3%)** across **115 regions**.
+- Non-zero bytes: L02 = 5,758, L04 = 9,019. The completed save carries ~3,261 more
+  non-zero bytes, which is the expected signature of accumulated unlocks.
+
+That is a small enough surface to map by hand, and it is the best available route
+to the completion list, chapter and substory flags — all of which resisted
+live-memory search.
+
+**Anchoring strategy:** known live-memory structures should have counterparts in
+the save. The ability bitfield (`0x0153020C`/`0x01530210` in RAM, 39 mapped bits)
+is the best anchor — sparse in an early save, dense in a completed one.
+
+#### Identified: weapon array at `0x007340`
+
+8-byte records, big-endian:
+
+```
+[u16 ammo][u16 count][u16 itemId][u16 FFFF]
+```
+
+`itemId` indexes the same catalogue as `data/items.tsv`, so the existing item
+table decodes save contents directly. `ammo = 0xFFFF` means infinite (melee).
+Verified by decoding L04 and reading off real weapon names — Flesh Shredder
+(674), Kagutsuchi (683), BB Gun (717), Satellite Laser (712), Golden Pistol
+(664), Dragon Arm (689), Anti-Tank Missile Launcher (711). Slot id 1 is
+`Locked Inventory Slot` and 0 is empty, matching the in-RAM convention.
+
+#### Candidate flag regions (L02 early vs L04 completed)
+
+169 x 32-byte windows gained 24+ set bits. The standouts:
+
+| Region | Shape | Guess |
+|---|---|---|
+| `0x005080`-`0x0051A0` | solid `FFFFFFFF` runs, zero in L02 | bulk unlock flags |
+| `0x016100`-`0x016140` | solid `FFFFFFFF` runs | bulk unlock flags |
+| `0x01A5C0`-`0x01A640` | **irregular** bit patterns | partial completion - best completion-list candidate |
+| `0x008700`-`0x008720` | mixed, partly set in L02 too | progressive flags |
+| `0x018A00` | repeating `3ca3ca02 38e38e03` | packed counters or per-entry state |
+
+The irregular regions are the interesting ones: solid `FFFFFFFF` means "all of
+this category unlocked", while a partial pattern means individually-tracked
+entries — which is what an Archipelago location pool needs.
+
+#### The pipeline this opens
+
+Apollo has both directions: **"Decrypt save game files"**
+(`exec_cmd.c:1488`) and **"Import decrypted save files"** / `encryptSaveFile`
+(`exec_cmd.c:1512`), which re-encrypts from `/dev_hdd0/tmp/apollo/<dir>/`. With
+resigning after, that is a complete **read-modify-write save editing loop**.
+
+Consequence: unlocking Premium Adventure may not require the imported save to
+load at all. Find the clear flag by diffing, set it in the console's *own* save,
+re-encrypt and resign. That sidesteps the entire import problem.
+
+### Lead: the Completion List is a location source
+
+This build has a **completion list** with rewards collected from Bob B once he
+texts you. Yakuza completion lists enumerate dozens to hundreds of discrete
+tasks, each individually tracked — which is exactly the shape an Archipelago
+location pool needs, and far richer than the 39 ability purchases that are
+currently the only location candidates. Worth finding the completion bitfield
+even before story-progress detection is solved.
+
+### The storage box at `0x01534EA4`
+
+Found by putting two items into it and searching for the distinctive id 629
+(Cutie Girl Figure). It uses the **same 8-byte record format** as the player
+inventory and sits **immediately after** it:
+
+```
+0x01534DE4  player inventory, 24 slots
+0x01534EA4  storage box          (0x01534DE4 + 24*8)
+```
+
+Extent not yet bounded. Useful for two reasons: it is somewhere to put an
+Archipelago item when the player's 24 slots are full, and its contents are
+themselves potential checks.
+
+### Ability bits persist in the save file
+
+An `FFFFFFFF` written to `0x01530210` during testing survived a save and
+reload, while `0x0153020C` came back as `0` from the older save state. So the
+ability bitfield is **saved game state, not runtime-only** — granting an
+ability sticks and does not need re-applying on load.
 
 ### The character stats struct at `0x0154BDB0`
 
@@ -906,7 +1268,7 @@ where one exists.
 
 ### The ability bitfield at `0x01530210`
 
-Mapped by clearing the field, granting 255 ability points, and buying abilities
+Mapped by clearing the field, granting 255 soul points, and buying abilities
 one at a time while `watch` recorded which bit flipped. Confirmed:
 
 | Bit | Ability | Bit | Ability |

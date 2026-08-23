@@ -17,7 +17,9 @@ if (Array.IndexOf(rest, "--host") >= 0)
     var i = Array.IndexOf(rest, "--host");
     var next = i + 1 < rest.Length ? rest[i + 1] : null;
     var host = Ps3Config.Require(next is null || next.StartsWith("--") ? null : next);
-    var pid = await Ps3Console.FindGameAsync(host);
+    uint? pid;
+    try { pid = await Ps3Console.FindGameAsync(host); }
+    catch (Ps3Exception ex) { Console.WriteLine(ex.Message); return 1; }
     if (pid is null) { Console.WriteLine("No game running on the console."); return 1; }
     var client = new Ps3MapiClient(host);
     client.Connect();

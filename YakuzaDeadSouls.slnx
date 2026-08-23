@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/client/">
+    <Project Path="client/ItemProbe/ItemProbe.csproj" />
+    <Project Path="client/Probe/Probe.csproj" />
+    <Project Path="client/Ps3Mapi/Ps3Mapi.csproj" />
+    <Project Path="client/Rpcs3Probe/Rpcs3Probe.csproj" />
+    <Project Path="client/Scanner/Scanner.csproj" />
+    <Project Path="client/SfoTool/SfoTool.csproj" />
+  </Folder>
+</Solution>

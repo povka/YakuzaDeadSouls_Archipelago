@@ -38,7 +38,7 @@ if (!game.LooksLikeGame()) { Console.WriteLine("FAIL: no ELF header at 0x10000")
 Console.WriteLine("ELF header present - reads work and bytes are not corrupted.");
 
 Console.WriteLine($"\n  money  {game.ReadU32(Addresses.Money),8} yen");
-Console.WriteLine($"  level  {game.ReadU8(Addresses.Level),8}   Ability points {game.ReadU8(Addresses.AbilityPoints)}");
+Console.WriteLine($"  level  {game.ReadU8(Addresses.Level),8}   Soul points {game.ReadU8(Addresses.SoulPoints)}");
 Console.WriteLine($"  exp    {game.ReadU32(Addresses.Exp),8}   total {game.ReadU32(Addresses.ExpTotal)}");
 Console.WriteLine($"  hp     {game.ReadU16(Addresses.HealthCurrent),8} / {game.ReadU16(Addresses.HealthMax)}");
 Console.WriteLine($"  focus  {game.ReadF32(Addresses.FocusCurrent),8} / {game.ReadF32(Addresses.FocusMax)}");

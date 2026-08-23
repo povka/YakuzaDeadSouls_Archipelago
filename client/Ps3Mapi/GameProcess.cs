@@ -20,7 +20,16 @@ public static partial class Ps3Console
     public static async Task<IReadOnlyList<ProcessEntry>> ListAsync(string host)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        var html = await http.GetStringAsync($"http://{host}/getmem.ps3mapi");
+        string html;
+        try
+        {
+            html = await http.GetStringAsync($"http://{host}/getmem.ps3mapi");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            throw new Ps3Exception(
+                $"cannot reach webMAN at {host}. Is the console on and on the same network?");
+        }
 
         var found = new List<ProcessEntry>();
         foreach (Match m in OptionPattern().Matches(html))

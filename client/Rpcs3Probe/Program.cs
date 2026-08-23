@@ -52,7 +52,7 @@ Console.WriteLine("  -> check the in-game inventory: 13 slots usable now?");
 
 foreach (var (label, where, size) in new[]
 {
-    ("exp mirror (inert, in RW data)", Addresses.ExpMirror, 4),
+    ("cumulative exp total (in RW data)", Addresses.ExpTotal, 4),
 })
 {
     Console.WriteLine($"\nwrite test - {label} at 0x{where:X8}:");
