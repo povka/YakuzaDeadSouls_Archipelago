@@ -18,9 +18,15 @@ Remove-Item -Force $out, $tmp -ErrorAction SilentlyContinue
 Get-ChildItem -Recurse -Force -Directory $src -Filter "__pycache__" |
     Remove-Item -Recurse -Force
 
-# The client and the apworld must agree on ability names AND their order, so
-# both read the same file. It is copied in at build time rather than duplicated.
-Copy-Item (Join-Path $repo "data/ability_bits.tsv") (Join-Path $src "ability_bits.tsv") -Force
+# C# is the source of truth for every id, name and amount. Regenerate Data.py
+# from it so a seed can never disagree with the client.
+$client = Join-Path $repo "client/ApClient/bin/Debug/net10.0/ydsclient.exe"
+if (Test-Path $client) {
+    & $client --emit-world $src
+    if ($LASTEXITCODE -ne 0) { throw "world generation failed" }
+} else {
+    Write-Warning "ydsclient not built - Data.py may be stale. Run: dotnet build"
+}
 
 Compress-Archive -Path $src -DestinationPath $tmp -Force
 Move-Item $tmp $out -Force

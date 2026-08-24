@@ -20,6 +20,7 @@ public sealed class ClientLoop(
     private int _itemsApplied;
     private bool _goalSent;
     private int _consecutiveFailures;
+    private int _soulPointBaseline = -1;
     private string? _statePath;
 
     public int PollMilliseconds { get; init; } = 2000;
@@ -87,6 +88,7 @@ public sealed class ClientLoop(
         await SendKaraokeChecksAsync();
         await SyncAbilitiesAsync();
         ApplyReceivedItems();
+        EnforceSoulPoints();
         CheckGoal();
         await DrainToastsAsync();
     }
@@ -141,10 +143,10 @@ public sealed class ClientLoop(
         foreach (var song in songs)
         {
             if (!song.EverSung) continue;
-            for (var tier = 0; tier < Karaoke.ScoreTiers.Length; tier++)
+            for (var tier = 0; tier < ApIds.ScoreTiers.Length; tier++)
             {
-                if (song.HighScore < Karaoke.ScoreTiers[tier]) continue;
-                var id = ApIds.LocationId(song.Id, tier);
+                if (song.HighScore < ApIds.ScoreTiers[tier]) continue;
+                var id = ApIds.KaraokeLocationId(song.Id, tier);
                 if (_sent.Add(id)) newly.Add(id);
             }
         }
@@ -171,25 +173,26 @@ public sealed class ClientLoop(
         }
     }
 
+    // Abilities are absent here on purpose - SyncAbilitiesAsync enforces those
+    // every tick rather than applying them once.
     private void Apply(long itemId)
     {
-        switch (itemId)
+        if (itemId == ApIds.ErikaCard)
         {
-            case ApIds.ErikaCard:
-                Hostesses.SetAvailable(game, Hostesses.Erika, true);
-                break;
-            case ApIds.YunaCard:
-                Hostesses.SetAvailable(game, Hostesses.Yuna, true);
-                break;
-            case ApIds.SubmachineGunAmmo:
-                if (Inventory.GrantAnywhere(game, ApIds.SubmachineGunAmmoItemId, 200) is null)
-                    Console.WriteLine("    inventory AND storage full - ammo dropped");
-                break;
-            case ApIds.SoulPoints:
-                GrantSoulPoints(ApIds.SoulPointsPerItem);
-                break;
-            // Abilities are handled by SyncAbilitiesAsync, which enforces them
-            // every tick rather than applying them once.
+            Hostesses.SetAvailable(game, Hostesses.Erika, true);
+        }
+        else if (itemId == ApIds.YunaCard)
+        {
+            Hostesses.SetAvailable(game, Hostesses.Yuna, true);
+        }
+        else if (ApIds.AmmoAmount(itemId) is { } rounds)
+        {
+            if (Inventory.GrantAnywhere(game, ApIds.SubmachineGunAmmoItemId, (uint)rounds) is null)
+                Console.WriteLine("    inventory AND storage full - ammo dropped");
+        }
+        else if (ApIds.SoulPointsAmount(itemId) is { } amount)
+        {
+            GrantSoulPoints(amount);
         }
     }
 
@@ -199,7 +202,40 @@ public sealed class ClientLoop(
         var current = game.ReadU8(Addresses.SoulPoints);
         var next = (byte)Math.Min(255, current + amount);
         game.Write(Addresses.SoulPoints, [next]);
+        _soulPointBaseline = next;
         Console.WriteLine($"    soul points {current} -> {next}");
+    }
+
+    // Soul points come from Archipelago, not from levelling up. There is no way
+    // to tell what caused a gain, only that one happened - so hold a baseline
+    // and take back anything that appears without the client having granted it.
+    // Spending is allowed through and lowers the baseline.
+    //
+    // Runs after ApplyReceivedItems so a grant this tick has already moved the
+    // baseline and is not immediately clawed back.
+    private void EnforceSoulPoints()
+    {
+        var current = game.ReadU8(Addresses.SoulPoints);
+
+        // First sample of the session: adopt whatever is there. Points earned
+        // while the client was closed are kept - the alternative is punishing
+        // the player for a disconnect.
+        if (_soulPointBaseline < 0)
+        {
+            _soulPointBaseline = current;
+            Console.WriteLine($"  soul points baseline {current}");
+            return;
+        }
+
+        if (current > _soulPointBaseline)
+        {
+            game.Write(Addresses.SoulPoints, [(byte)_soulPointBaseline]);
+            Console.WriteLine($"  soul points {current} -> {_soulPointBaseline} (in-game gain suppressed)");
+        }
+        else if (current < _soulPointBaseline)
+        {
+            _soulPointBaseline = current;
+        }
     }
 
     private void CheckGoal()

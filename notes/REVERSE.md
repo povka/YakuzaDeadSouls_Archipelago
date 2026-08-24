@@ -1324,10 +1324,31 @@ per-song best, because none exists. Two consequences:
 | `0x001D3F` | `0x0153100F` | `00` -> `20` |
 | `0x00349F` | `0x0153276F` | `00` -> `02` |
 
-All are `0x1F mod 0x20` — the same 32-byte-stride sparse table that holds the
-hostess availability flags (`0x001FBF` Erika, `0x00203F` Yuna). So that table is
-general game state, not hostess-specific, and its entries hold **values**, not
-just 0/1. These four are per-song-tracking candidates.
+All are `0x1F mod 0x20`, as are the hostess availability flags (`0x001FBF`
+Erika, `0x00203F` Yuna).
+
+**CORRECTION — that is a coincidence, not a table.** Examining the region in the
+130-hour save shows structures that do *not* respect a 0x20 grid: bytes 0-3 of
+each apparent record are a bitfield, bytes 4-27 are zero, and bytes 28-31 are a
+**little-endian Unix timestamp** (2024 dates). Data also straddles the assumed
+boundaries — the record at `0x1F60` carries `14 b0 df 11` in its tail while
+`0x1F80` opens with `14 b0 df 00`.
+
+So sampling every 32nd byte and counting non-zero values produces a number
+(327 "entries" set in a complete save but not an early one) that means nothing.
+Do not treat it as a location count.
+
+What *is* verified, empirically and in both directions, is only this:
+
+| RAM | Effect |
+|---|---|
+| `0x0153128F` | 0 blocks Erika, 1 allows her |
+| `0x0153130F` | 0 blocks Yuna, 1 allows her |
+
+Those hold. The generalisation to a table of flags does not. The region clearly
+carries a lot of progression state — worth mining — but its structure has to be
+established with controlled one-event-at-a-time diffs, exactly as the hostess and
+karaoke work was done, rather than inferred from a grid.
 
 **Next experiment:** sing a *different* song and diff again. That resolves
 whether the leading bytes of a board entry identify the song, and whether the
@@ -1513,9 +1534,39 @@ the ability itself is the item.**
 |---|---|
 | Locations | `Ability: <name>`, ids `BASE_ID + 1000 + index` |
 | Items | `<name>`, `useful` — nothing in the logic requires one |
-| Filler | `Submachine Gun Ammo`, `Soul Points` (+5 per item, saturating at 255) |
+| Filler | `Submachine Gun Ammo (20..200)` and `Soul Points (1..10)`, ten variants each |
 
 Pool is now **72 locations / 43 items** (33 karaoke + 39 abilities).
+
+#### Filler amounts live in item names, not in a client-side roll
+
+Both filler types are sets of named variants rather than one item whose value the
+client rolls. The amount is then fixed by the seed, appears in the spoiler log,
+and other players see what they are sending — a hint reading `Soul Points (9)`
+is useful where `Soul Points` is not.
+
+| Item | Ids | Variants |
+|---|---|---|
+| `Soul Points (n)` | `BASE_ID + 3..12` | every value 1-10 |
+| `Submachine Gun Ammo (n)` | `BASE_ID + 13..22` | 20, 40, ... 200 |
+
+**Ammo is bucketed, soul points are not.** Ten values covers 1-10 exactly, but
+1-200 would need 200 near-identical entries in the datapackage, every hint and
+tracker line, for a distinction no player can act on. `AMMO_AMOUNTS` in
+`Items.py` is the knob; the client mirrors it in `ApIds.AmmoAmounts` and the two
+must match.
+
+`BASE_ID + 2` is retired — it was the old single-amount ammo item.
+
+`get_filler_item_name` picks the *kind* first, then the amount. Choosing
+uniformly across `FILLER_ITEMS` would weight by variant count rather than by
+category. A 72-location seed came out 18 ammo to 13 soul points.
+
+
+
+The client grants soul points by adding to the u8 at `Addresses.SoulPoints`,
+saturating at 255 rather than wrapping. Ammo goes through
+`Inventory.GrantAnywhere`, so a full inventory sends it to the storage box.
 
 #### The bit layout
 
@@ -1557,6 +1608,115 @@ per-ability costs, which are not mapped.
 zipping, and `Abilities.py` reads it back with `pkgutil.get_data` (which works
 through zipimport). So the apworld and the client derive ability names *and*
 their id ordering from the same file. Reordering that file breaks existing seeds.
+
+### C# is the source of truth; the apworld's data is generated
+
+`client/ApClient/ApIds.cs` holds every id, name, tier and amount.
+`ydsclient --emit-world [dir]` writes `world/yakuza_dead_souls/Data.py` from it,
+and `build-apworld.ps1` runs that before zipping — so a seed can never disagree
+with the client, and there is no Python tooling in the repo.
+
+Hand-written Python is now only the World class and the options:
+
+| File | Lines | |
+|---|---|---|
+| `Data.py` | ~590 | **generated** — item table, location table, name helpers |
+| `__init__.py` | ~100 | the World class |
+| `Options.py` | 18 | one toggle |
+
+`Data.py` emits fully expanded tables, so the apworld performs no computation —
+it reads `ITEM_TABLE` (name -> id, classification) and `LOCATION_TABLE`
+(name -> id) and hands them to Archipelago.
+
+**Consequences worth knowing:**
+
+- Editing `Data.py` by hand is pointless; the next build overwrites it.
+- `data/ability_bits.tsv` is no longer copied into the apworld. `Abilities`
+  still reads it C#-side, and the names reach Python through the generator.
+- Score tiers moved from `Karaoke.cs` to `ApIds.cs`. Thresholds are an
+  Archipelago design choice rather than a fact about the game, so `Karaoke`
+  now exposes only raw scores and the probe prints them without tiers.
+
+### Soul points: Useful, and exactly enough to buy everything
+
+Soul points are `useful`, not `filler`, and the pool carries **exactly the total
+needed to buy all 39 abilities** — so a seed is always completable but never
+generous. Spend them badly and you cannot buy everything.
+
+Amounts are **random 1-10 and still sum exactly to the total**. The world starts
+every item at the minimum, then scatters the remainder one point at a time over
+items that still have headroom, using the seeded RNG — so the split varies per
+seed and the total is exact however the draw falls.
+
+That split lives in Python rather than the emitter because it needs the *seed's*
+RNG. Anything computed at emit time would be identical in every seed.
+
+`SoulPointItemCount` is 43, chosen so a uniform 1-10 draw averages out to 239
+(239 / 5.5 ~= 43). Verified across five seeds: 43 items, total 239, amounts
+inside 1-10 every time.
+
+**This required growing the pool.** 43 soul-point items plus 41 fixed items does
+not fit in 72 locations, so karaoke went from 3 tiers to **5**
+(550/650/750/800/850), taking the world to **94 locations** — 55 karaoke, 39
+abilities. The lower two tiers also make early checks flow, since a casual first
+attempt scores around 750.
+
+**The total is provisional.** `data/ability_bits.tsv` has an optional 4th column
+for per-ability cost in soul points. While it is absent, `TotalSoulPoints` falls
+back to `ObservedTotalAbilityCost` = **239**, derived from the player starting
+with 255, buying all 39 abilities, and finishing with 16 left. Fill in the 4th
+column and `Abilities.CostsKnown` flips, the real sum takes over, and nothing
+else needs touching.
+
+Filler is now ammo only, since soul points are placed deliberately rather than
+drawn at random.
+
+### Soul points are an Archipelago resource, not a level-up reward
+
+`EnforceSoulPoints` holds a baseline and takes back any increase the client did
+not cause, so levelling up no longer awards usable points. Spending is allowed
+through and lowers the baseline.
+
+There is no way to tell *what* caused a change — only that one happened — so the
+rule is directional rather than attributive:
+
+| Observed | Action |
+|---|---|
+| current > baseline | write the baseline back; an in-game gain |
+| current < baseline | accept; the player spent |
+| first sample of a session | adopt whatever is there |
+
+Ordering matters: it runs **after** `ApplyReceivedItems`, because
+`GrantSoulPoints` moves the baseline as it writes. Run the other way round and
+every Archipelago grant would be clawed back on the same tick.
+
+Verified live on console: poking 6 -> 40 was reverted to 6 within a tick and
+logged as suppressed; poking 6 -> 3 was left alone.
+
+**Two known leaks, both deliberate:**
+
+- Points gained while the client is closed are kept — the first sample adopts
+  them. Punishing a player for a disconnect is worse than the leak.
+- A level-up and a purchase inside the same 2 s tick can net out, hiding the
+  gain.
+
+**Interaction worth watching:** soul points are now scarce *and* buying an
+ability clears the bit without a refund. A player who re-buys an ability that
+Archipelago has not sent pays twice for nothing. The check is already sent so
+there is no exploit, but the wasted currency now costs a real resource rather
+than a free one. Refunding needs per-ability costs, which are not mapped.
+
+### Current pool
+
+| | |
+|---|---|
+| Locations | **72** — 33 karaoke (11 songs x 3 tiers) + 39 ability purchases |
+| Items | **251** — 2 cards, 39 abilities, 200 ammo amounts, 10 soul point amounts |
+| Score tiers | 750 / 800 / 850 |
+
+Ammo is every value from 1 to 200 rather than buckets. That is 200 near-identical
+datapackage entries, which is a real cost in hints and trackers, and a deliberate
+choice.
 
 ### Known fragility: the ids are duplicated
 

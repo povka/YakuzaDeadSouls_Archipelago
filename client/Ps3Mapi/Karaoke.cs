@@ -41,12 +41,4 @@ public static class Karaoke
         return songs;
     }
 
-    public static readonly int[] ScoreTiers = [800, 850, 900];
-
-    public static IEnumerable<int> ClearedTiers(Song song)
-    {
-        foreach (var tier in ScoreTiers)
-            if (song.HighScore >= tier)
-                yield return tier;
-    }
 }

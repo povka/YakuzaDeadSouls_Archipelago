@@ -5,6 +5,17 @@ using YakuzaDeadSouls.Ps3;
 
 if (args.Contains("--help")) { Usage(); return 0; }
 
+if (Array.IndexOf(args, "--emit-world") is var emitAt and >= 0)
+{
+    var dir = emitAt + 1 < args.Length && !args[emitAt + 1].StartsWith("--")
+        ? args[emitAt + 1]
+        : Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+                       "world", "yakuza_dead_souls");
+    var written = WorldEmitter.Write(Path.GetFullPath(dir));
+    Console.WriteLine($"wrote {written}");
+    return 0;
+}
+
 // No arguments means it was double-clicked, so ask instead of exiting.
 var interactive = args.Length == 0;
 
@@ -109,6 +120,7 @@ void Usage() => Console.WriteLine($"""
       --password <pw>      room password, if any
       --host <ip>          PS3 address; otherwise taken from console.txt
       --no-notify          do not show multiworld messages on the TV
+      --emit-world [dir]   regenerate the apworld's Data.py and exit
 
     {Ps3Config.HelpText}
     """);
