@@ -1,6 +1,6 @@
-name: Akiyama
-game: Yakuza Dead Souls
-description: "Prototype - karaoke locations, hostess cards + SMG ammo"
+name: Uncle_Kaz
+game: "Yakuza Dead Souls"
+description: ""
 
-Yakuza Dead Souls:
+"Yakuza Dead Souls":
   start_with_one_card: false
