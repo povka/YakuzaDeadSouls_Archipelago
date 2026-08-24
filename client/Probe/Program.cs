@@ -43,6 +43,12 @@ Console.WriteLine($"  exp    {game.ReadU32(Addresses.Exp),8}   total {game.ReadU
 Console.WriteLine($"  hp     {game.ReadU16(Addresses.HealthCurrent),8} / {game.ReadU16(Addresses.HealthMax)}");
 Console.WriteLine($"  focus  {game.ReadF32(Addresses.FocusCurrent),8} / {game.ReadF32(Addresses.FocusMax)}");
 
+var abilityWindow = Abilities.Read(game);
+var owned = Abilities.All.Where(a => Abilities.IsSet(abilityWindow, a)).ToArray();
+Console.WriteLine($"\nabilities: {owned.Length}/{Abilities.Count} unlocked");
+foreach (var a in owned)
+    Console.WriteLine($"  0x{a.Address:X8} bit {a.Bit,2}  {a.Name}");
+
 Console.WriteLine("\nhostesses (goal: both maxed):");
 foreach (var (id, who) in new (ushort, string)[]
          {

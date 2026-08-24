@@ -18,6 +18,10 @@ Remove-Item -Force $out, $tmp -ErrorAction SilentlyContinue
 Get-ChildItem -Recurse -Force -Directory $src -Filter "__pycache__" |
     Remove-Item -Recurse -Force
 
+# The client and the apworld must agree on ability names AND their order, so
+# both read the same file. It is copied in at build time rather than duplicated.
+Copy-Item (Join-Path $repo "data/ability_bits.tsv") (Join-Path $src "ability_bits.tsv") -Force
+
 Compress-Archive -Path $src -DestinationPath $tmp -Force
 Move-Item $tmp $out -Force
 Write-Output "built $out ($((Get-Item $out).Length) bytes)"

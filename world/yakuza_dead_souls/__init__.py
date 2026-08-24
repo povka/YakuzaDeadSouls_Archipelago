@@ -2,7 +2,9 @@ from BaseClasses import Region, Tutorial
 from worlds.AutoWorld import WebWorld, World
 
 from .Items import (
+    ABILITY_ITEMS,
     FILLER_ITEM,
+    FILLER_ITEMS,
     HOSTESS_CARDS,
     ITEM_NAME_TO_ID,
     ITEM_TABLE,
@@ -57,7 +59,7 @@ class YakuzaDeadSoulsWorld(World):
         return YakuzaDeadSoulsItem(name, classification, ITEM_NAME_TO_ID[name], self.player)
 
     def get_filler_item_name(self) -> str:
-        return FILLER_ITEM
+        return self.random.choice(FILLER_ITEMS)
 
     def create_items(self) -> None:
         cards = list(HOSTESS_CARDS)
@@ -68,9 +70,10 @@ class YakuzaDeadSoulsWorld(World):
             self.multiworld.push_precollected(self.create_item(granted))
 
         pool = [self.create_item(card) for card in cards]
+        pool += [self.create_item(name) for name in ABILITY_ITEMS]
 
         remaining = len(ALL_LOCATIONS) - len(pool)
-        pool += [self.create_item(FILLER_ITEM) for _ in range(remaining)]
+        pool += [self.create_item(self.get_filler_item_name()) for _ in range(remaining)]
 
         self.multiworld.itempool += pool
 

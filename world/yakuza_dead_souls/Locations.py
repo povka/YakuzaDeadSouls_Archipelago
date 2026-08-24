@@ -1,5 +1,7 @@
 from BaseClasses import Location
 
+from .Abilities import ABILITY_NAMES
+
 BASE_ID = 8_960_000
 
 # Song ids are the index into the per-song score table at RAM 0x01547CD4,
@@ -43,7 +45,21 @@ for _song_id in sorted(SONG_NAMES):
         LOCATION_NAME_TO_ID[_name] = BASE_ID + _song_id * MAX_TIERS_PER_SONG + _index
         LOCATION_SONG_TIER[_name] = (_song_id, _tier)
 
+# Buying an ability is the check. Offset well clear of the karaoke block, which
+# runs to BASE_ID + 109.
+ABILITY_LOCATION_BASE = BASE_ID + 1000
+
+# location name -> ability index, for the client
+LOCATION_ABILITY: dict[str, int] = {}
+
+for _index, _ability in enumerate(ABILITY_NAMES):
+    _name = f"Ability: {_ability}"
+    LOCATION_NAME_TO_ID[_name] = ABILITY_LOCATION_BASE + _index
+    LOCATION_ABILITY[_name] = _index
+
 ALL_LOCATIONS = tuple(LOCATION_NAME_TO_ID)
+KARAOKE_LOCATIONS = tuple(LOCATION_SONG_TIER)
+ABILITY_LOCATIONS = tuple(LOCATION_ABILITY)
 
 
 class YakuzaDeadSoulsLocation(Location):

@@ -44,7 +44,23 @@ if (login is LoginFailure failure)
 }
 Console.WriteLine("  connected");
 
-var loop = new ClientLoop(game, session, slot);
+Notifier? notifier = null;
+if (!args.Contains("--no-notify"))
+{
+    var candidate = new Notifier(ps3Host);
+    var channel = await candidate.DetectAsync();
+    if (channel != Notifier.Channel.None)
+    {
+        notifier = candidate;
+        Console.WriteLine($"  toasts on via {channel} - multiworld messages show on the TV");
+    }
+    else
+    {
+        Console.WriteLine("  no notification channel answered - toasts off");
+    }
+}
+
+var loop = new ClientLoop(game, session, slot, notifier);
 loop.EnforceGates();
 
 using var cancel = new CancellationTokenSource();
@@ -92,6 +108,7 @@ void Usage() => Console.WriteLine($"""
       --port <n>           Archipelago port     (default 38281)
       --password <pw>      room password, if any
       --host <ip>          PS3 address; otherwise taken from console.txt
+      --no-notify          do not show multiworld messages on the TV
 
     {Ps3Config.HelpText}
     """);

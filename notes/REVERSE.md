@@ -1465,6 +1465,99 @@ Three fixes:
 free — connections are*. Prefer one wide read over several narrow ones even when
 the extra bytes are wasted; 44 bytes in one connection beats 8 bytes in three.
 
+### Multiworld messages on the TV
+
+Every Archipelago log message becomes a PS3 toast, so the player sees
+"`Uncle_Kaz sent Comedy Skill to shishi-sims (GET to the Top!: 850+)`" on screen
+without alt-tabbing.
+
+**webMAN is the preferred channel, deliberately.** PS3MAPI already requires
+webMAN, so notifications cost the player no extra setup — CCAPI was removed from
+the test console for exactly that reason. webMAN also carries sound (`snd=5`, the
+trophy chime); its only downside is the plain info icon, and CCAPI's trophy icon
+is not worth a second install. CCAPI remains a fallback if webMAN's HTTP is
+somehow unreachable.
+
+| Channel | Port | Icon | Sound |
+|---|---|---|---|
+| **webMAN** `notify.ps3mapi` | 80 | info only | yes |
+| CCAPI `/ccapi/notify` | 6333 | trophy | no |
+
+Messages cap at **199 characters** and are truncated with an ellipsis.
+
+#### Why the toasts are queued rather than sent inline
+
+`MessageLog.OnMessageReceived` fires on Archipelago's **receive thread**. A toast
+is an HTTP GET with an 8 s timeout, so sending one inline stalls that thread and
+the client stops reading its own socket. Messages are queued and drained from the
+poll loop instead, at most 3 per tick with the queue capped at 40, so a busy
+multiworld cannot bury the screen or exhaust memory. The queue is cleared once at
+connect so the server's replayed backlog does not produce a wall of toasts.
+
+**Note this is a different hazard from the one that would apply on the PS3MAPI
+control socket.** If toasts went through `PS3 NOTIFY` over TCP 7887, a call from
+another thread would inject a command mid `PASV` -> `MEMORY GET` -> `226`
+sequence and desync which response belongs to which request — genuine protocol
+corruption. `Notifier` uses HTTP on a separate connection, so that specific
+failure cannot happen; the reason to queue is thread-blocking, not corruption.
+
+A single static `HttpClient` is reused for the process. One per toast exhausts
+sockets once messages arrive in bulk.
+
+### Abilities as locations, benefits as items
+
+All 39 of Akiyama's abilities are now in the world: **buying one is the check,
+the ability itself is the item.**
+
+| | |
+|---|---|
+| Locations | `Ability: <name>`, ids `BASE_ID + 1000 + index` |
+| Items | `<name>`, `useful` — nothing in the logic requires one |
+| Filler | `Submachine Gun Ammo`, `Soul Points` (+5 per item, saturating at 255) |
+
+Pool is now **72 locations / 43 items** (33 karaoke + 39 abilities).
+
+#### The bit layout
+
+Two big-endian u32 words, and `data/ability_bits.tsv` is the source of truth for
+names, addresses, bits and ordering:
+
+```
+0x0153020C   bits 2-20, 22-31
+0x01530210   bits 0-9
+```
+
+`Abilities.cs` reads them as an 8-byte window covering both, so one read gets all
+39. Verified live: `0x01530210 = 0x00000002` decoded to exactly `Head Tracking`,
+which the TSV lists at bit 1.
+
+#### `SyncAbilitiesAsync` enforces rather than applies
+
+Each tick it compares the bitfield against the set of abilities Archipelago has
+sent:
+
+- **set but not granted** — the player just bought it. Send the check, then
+  **clear the bit**. They paid, they got the check, but the ability does not
+  work until the item arrives.
+- **granted but not set** — turn it on.
+- Write back only when something differed.
+
+This is the same idempotent-enforcement shape as `EnforceGates`, and it is why
+abilities are deliberately **not** handled in `Apply` — that runs once per item,
+which cannot re-assert state the game or a reload changed.
+
+**Known rough edge:** after the bit is cleared the game shows the ability as
+unpurchased, so the player can buy it again and waste soul points. The check is
+already sent so there is no exploit, just wasted currency. Refunding would need
+per-ability costs, which are not mapped.
+
+#### One source of truth for names
+
+`build-apworld.ps1` copies `data/ability_bits.tsv` into the world folder before
+zipping, and `Abilities.py` reads it back with `pkgutil.get_data` (which works
+through zipimport). So the apworld and the client derive ability names *and*
+their id ordering from the same file. Reordering that file breaks existing seeds.
+
 ### Known fragility: the ids are duplicated
 
 Location and item ids exist in two places with nothing enforcing agreement:

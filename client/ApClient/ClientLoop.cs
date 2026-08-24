@@ -5,8 +5,17 @@ using YakuzaDeadSouls.Ps3;
 
 namespace YakuzaDeadSouls.ApClient;
 
-public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, string slot)
+public sealed class ClientLoop(
+    GameProcess game, ArchipelagoSession session, string slot, Notifier? notifier = null)
 {
+    // OnMessageReceived fires on the Archipelago receive thread. Toasts are an
+    // HTTP call with an 8s timeout, so sending one inline would stall that
+    // thread and stop the client reading its own socket. Queue here, send from
+    // the poll loop, capped so a busy multiworld cannot bury the screen.
+    private readonly System.Collections.Concurrent.ConcurrentQueue<string> _toasts = new();
+    private const int MaxToastsPerTick = 3;
+    private const int MaxQueuedToasts = 40;
+
     private readonly HashSet<long> _sent = [];
     private int _itemsApplied;
     private bool _goalSent;
@@ -48,6 +57,7 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, str
         LoadApplied();
         Console.WriteLine($"  {_sent.Count} location(s) already checked on the server");
         Console.WriteLine($"  {_itemsApplied} item(s) already applied to this save");
+        _toasts.Clear();
 
         while (!cancel.IsCancellationRequested)
         {
@@ -75,8 +85,52 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, str
     private async Task PollAsync()
     {
         await SendKaraokeChecksAsync();
+        await SyncAbilitiesAsync();
         ApplyReceivedItems();
         CheckGoal();
+        await DrainToastsAsync();
+    }
+
+    // Buying an ability is the check; the ability itself is the item. So a bit
+    // the player set by spending gets reported and then cleared, and only an
+    // ability Archipelago has actually sent stays on. One 8-byte read covers
+    // both words, and the write only happens when something differs.
+    private async Task SyncAbilitiesAsync()
+    {
+        var abilities = Abilities.All;
+        if (abilities.Count == 0) return;
+
+        var granted = new HashSet<int>();
+        foreach (var item in session.Items.AllItemsReceived)
+            if (ApIds.AbilityIndexOfItem(item.ItemId) is { } index)
+                granted.Add(index);
+
+        var window = Abilities.Read(game);
+        var dirty = false;
+        var newly = new List<long>();
+
+        foreach (var ability in abilities)
+        {
+            var isSet = Abilities.IsSet(window, ability);
+            var shouldBeSet = granted.Contains(ability.Index);
+            if (isSet == shouldBeSet) continue;
+
+            if (isSet)
+            {
+                var id = ApIds.AbilityLocationId(ability.Index);
+                if (_sent.Add(id))
+                {
+                    newly.Add(id);
+                    Console.WriteLine($"  check: bought {ability.Name}");
+                }
+            }
+
+            Abilities.Set(window, ability, shouldBeSet);
+            dirty = true;
+        }
+
+        if (dirty) Abilities.Write(game, window);
+        if (newly.Count > 0) await session.Locations.CompleteLocationChecksAsync([.. newly]);
     }
 
     private async Task SendKaraokeChecksAsync()
@@ -131,7 +185,21 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, str
                 if (Inventory.GrantAnywhere(game, ApIds.SubmachineGunAmmoItemId, 200) is null)
                     Console.WriteLine("    inventory AND storage full - ammo dropped");
                 break;
+            case ApIds.SoulPoints:
+                GrantSoulPoints(ApIds.SoulPointsPerItem);
+                break;
+            // Abilities are handled by SyncAbilitiesAsync, which enforces them
+            // every tick rather than applying them once.
         }
+    }
+
+    // u8, so it saturates rather than wrapping to nothing.
+    private void GrantSoulPoints(int amount)
+    {
+        var current = game.ReadU8(Addresses.SoulPoints);
+        var next = (byte)Math.Min(255, current + amount);
+        game.Write(Addresses.SoulPoints, [next]);
+        Console.WriteLine($"    soul points {current} -> {next}");
     }
 
     private void CheckGoal()
@@ -142,8 +210,25 @@ public sealed class ClientLoop(GameProcess game, ArchipelagoSession session, str
         _goalSent = true;
     }
 
-    private static void OnMessage(LogMessage message) =>
-        Console.WriteLine($"  [ap] {message}");
+    private void OnMessage(LogMessage message)
+    {
+        var text = message.ToString();
+        Console.WriteLine($"  [ap] {text}");
+
+        if (notifier is null || string.IsNullOrWhiteSpace(text)) return;
+        if (_toasts.Count >= MaxQueuedToasts) return;
+        _toasts.Enqueue(text);
+    }
+
+    private async Task DrainToastsAsync()
+    {
+        if (notifier is null) return;
+        for (var i = 0; i < MaxToastsPerTick && _toasts.TryDequeue(out var text); i++)
+        {
+            try { await notifier.SendAsync(text); }
+            catch (Exception) { /* a dropped toast is not worth reporting */ }
+        }
+    }
 
     public void EnforceGates()
     {
