@@ -1,0 +1,6 @@
+{
+  "include": ["world"],
+  "extraPaths": ["../Archipelago"],
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none"
+}
