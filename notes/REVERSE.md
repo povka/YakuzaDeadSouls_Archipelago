@@ -1706,6 +1706,274 @@ Archipelago has not sent pays twice for nothing. The check is already sent so
 there is no exploit, but the wasted currency now costs a real resource rather
 than a free one. Refunding needs per-ability costs, which are not mapped.
 
+### Character scoping: missable content, not reachability
+
+The story runs **Akiyama -> Majima -> Goda -> Kiryu -> Finale** and never lets
+you return to an earlier part. So a location only one character can reach is
+**missable** for everyone after them: an item a later character needs, placed
+behind Akiyama-only content, produces a seed that cannot be finished.
+
+Note this is a *missability* rule, not a reachability one. Akiyama's content is
+reachable first, so plain reachability logic would happily place a Majima item
+there.
+
+**Finale is exempt** — everything collected carries into it, so a Finale-only
+item is safe anywhere.
+
+Encoded as a bit per character on both sides:
+
+```
+None = 0, Akiyama = 1, Majima = 2, Goda = 4, Kiryu = 8, Finale = 16
+```
+
+| Side | Meaning |
+|---|---|
+| `LOCATION_CHARACTERS` | who can reach this location |
+| `ITEM_CHARACTERS` | who needs this item; 0 = anyone |
+
+`ApIds.MayPlace` allows a placement when the item is unscoped, Finale-only, or
+its character set is a subset of the location's. The apworld applies it with
+`add_item_rule`; items belonging to other players are always allowed.
+
+#### Known song access
+
+| Song | Characters |
+|---|---|
+| `0x09` Raindrops | Akiyama, Majima |
+| `0x0A` GET to the Top! | Akiyama, Majima |
+| `0x02` Where Has Your Touch Gone? | **Akiyama only** |
+| everything else | Akiyama (provisional) |
+
+Majima's two songs come from the player. Goda's and Kiryu's access is unmapped,
+so songs default to **Akiyama alone** — the conservative direction, since
+over-restricting placement only costs the fill some freedom, where
+under-restricting yields unwinnable seeds.
+
+The rule is currently inert: every item in the world is Akiyama's or unscoped, so
+nothing gets rejected. It exists so that adding Majima later is a data change
+rather than a redesign.
+
+### The client must not act while no save is loaded
+
+**Bug that cost a player their soul points.** On the title screen and during a
+load, the whole stats block reads as zeros. `EnforceSoulPoints` treated the 0 as
+"the player spent everything", adopted it as the new baseline, and after the save
+reloaded clawed the real value back down to 0.
+
+Fixed with `Addresses.SaveLoaded(game)` — one 0x28 read of the stats block,
+true only when `HealthMax > 0` and `Level > 0`. `PollAsync` returns early when it
+is false, and resets the soul-point baseline so the next loaded tick re-samples
+rather than trusting a stale one.
+
+A "two consecutive readings agree" guard was tried first and is **not enough**: a
+title screen lasts many ticks, so a bogus value gets confirmed and adopted. The
+fix has to be *is the game in a state where these addresses mean anything*, not
+*does this reading look stable*.
+
+This protects everything, not just soul points. Hostess gates, ability bits and
+karaoke scores were all being enforced against zeros.
+
+#### Not a bug: repeated soul-point suppression
+
+A log showing `soul points 14 -> 12 (in-game gain suppressed)` thirteen times was
+correct behaviour — the player was levelling repeatedly and each level grants +2.
+Confirmed by observation: a poked value of 99 sat still for two reads and then
+became 101 on its own. Suppression logging is now deduplicated so a run of
+identical claw-backs prints once.
+
+#### Also fixed: crash on disconnect
+
+`session.Socket.DisconnectAsync()` throws `WebSocketException` when the socket is
+already closed — which is exactly the case after a dropped connection, the only
+time that line runs after an abnormal exit. Now wrapped.
+
+### Locations must be filtered to what the build can actually reach
+
+All 11 song names are now known, along with who can sing each. Akiyama can sing
+only **four**: Where Has Your Touch Gone?, Pure Love in Kamurocho, Raindrops,
+GET to the Top!.
+
+Creating locations for all 11 was a real bug — 7 songs' checks could never be
+completed by an Akiyama-only build, so a seed would look valid and be
+uncompletable. `ApIds.Playable` names the characters a build covers and
+`ApIds.Reachable` filters the emitted tables. Adding Majima later means widening
+that constant.
+
+### The ability system consumes the whole pool
+
+Every ability is *both* a location (buying it) and an item (receiving it), so 39
+abilities contribute 39 locations and 39 items — exactly self-cancelling. Add the
+2 hostess cards and an Akiyama build at one karaoke tier has:
+
+| | |
+|---|---|
+| Locations | 43 (4 karaoke + 39 abilities) |
+| Required items | 41 (2 cards + 39 abilities) |
+| Free slots | **2** |
+
+Soul points want 43 items totalling 239. They do not fit, and Archipelago does
+not error — it reports `had 41 more items than locations` and **silently drops
+them**, producing a seed where abilities can never be bought.
+
+Anything that adds items without adding locations needs check sources that are
+not themselves items. Substories, the completion list and hostess ranks are the
+candidates; all need mapping first.
+
+### Money as filler
+
+Every yen value from **100 to 50,000** is its own item (`"1,234 Yen"`), ids
+`BaseId + 10000` upward. The client adds to the u32 at `Addresses.Money`.
+
+That is **49,901 item names**, and the cost was measured rather than assumed:
+
+| | |
+|---|---|
+| `Data.py` | 2.0 MB, 50,374 lines |
+| `.apworld` | 241 KB — the zip compresses repetitive names well |
+| Emit time | 0.28 s |
+| Generation | 0.52 s, up from 0.02 s |
+| Item types | 50,152 |
+
+Workable. The datapackage every other client downloads grows, but Archipelago
+caches it by checksum so it is a one-time cost per version.
+
+`get_filler_item_name` picks kind first (ammo or money) then the amount, so
+adding variants to one kind does not change how often the other appears.
+
+**No filler is currently placed at all.** With 43 locations and 41 required items
+there are 2 free slots, both taken by soul points. Money and ammo exist in the
+table and will only start appearing once shop-purchase checks grow the pool.
+
+### There is no "items obtained" record
+
+Tested directly: bought **Rubber Hose** (id 579) for 1,100 yen, saving either
+side. **35 bytes changed in 8 regions**, and the item id appears in exactly one
+of them:
+
+```
+save 0x005B24  RAM 0x01534DF4   00..00 -> 02 43 00 00 00 00 00 01
+```
+
+That is `Inventory.Base + 16`, i.e. inventory slot 2. Nowhere else in the save.
+The rest is play time, position floats, money (14,950 -> 13,850, exactly the
+price), the save counter, and the usual pair of timestamp-like values at
+`0x0091CD` / `0x016189`.
+
+A speculative search for a per-item bitfield found a dense region at save
+`0x005078` (776 bits set in a 130-hour save, zero in a chapter-2 one), but it is
+**not** item-shaped: entire 32-bit words are either `FFFFFFFF` or `00000000`, and
+nobody owns exactly 32 consecutive item ids. Some per-category all-or-nothing
+marker, not an obtained-items record.
+
+**Consequence for shop locations.** Ownership is the only signal, so the client
+must poll inventory and storage, notice an item appearing, and remember it
+locally per seed. Archipelago checks are one-way, so a transient observation is
+enough — but a purchase made *and* consumed while the client is closed is missed.
+
+**And per-item locations carry a reachability risk.** 488 items across weapons,
+armour, accessories, consumables and hostess gifts are non-placeholder, but which
+are obtainable during Akiyama's chapters is unknown. Creating locations for items
+a build cannot reach is the same bug just fixed for karaoke songs, at ten times
+the scale.
+
+### SOLVED: the shop stock table
+
+Found in RPCS3 after console scanning failed. Reached through a **static
+pointer**, so it works on hardware too:
+
+```
+[0x01612CD8]  -> shop header (heap)
+   header +0x08  u16  entry count      (37 for Poppo Showa St.)
+   header +0x0C  u32  -> entry table
+   header +0x10  u32[] UI string pointers ("Cancel", "Total") - not item names
+
+entry table, 0x20 per record, in menu order:
+   +0x00  u16  item id
+   +0x04  u32  ptr -> the header
+   +0x08  u32  ptr -> the header
+   +0x0C  u32  0
+   +0x10  u32  price
+   +0x14  u32  price (duplicate)
+   +0x18  u32  ptr -> the item's description string
+   +0x1C  u32  0x0000FFFF
+```
+
+Verified against Poppo Showa St.: all **37 ids in exact menu order**, prices
+correct (Tauriner 250, Rubber Hose 1100 - both match what the player paid).
+
+`0x01612CD8` is **not shop-specific** - it is a general "current menu data" slot.
+With a shop open it holds the shop header; otherwise it points at something else
+entirely (the console read `44445358`, `"DDSX"`, a texture header, while idle).
+That doubles as the *is a shop open* test: dereference, sanity-check the count
+and that entry 0 holds a valid item id.
+
+Stock is **static across characters and parts** - identical in Akiyama's Part 1
+and Kiryu's Part 4.
+
+#### What this enables
+
+Rewriting `+0x00` changes what a slot sells, `+0x10`/`+0x14` changes the price,
+and `+0x18` repoints the description - which is the route to showing which
+Archipelago item a slot holds. Item *names* come from the global item table
+rather than the shop, so displaying an arbitrary name needs that table patched
+instead.
+
+#### How it was found, after the id search failed
+
+Searching for the id list directly failed across 32 MB of console memory and
+128 MB of heap, because **every id-shaped structure in this game is a full
+1128-entry table** and 30 of Poppo's 37 ids are small enough to appear inside any
+incrementing run. Filtering to distinctive ids (209, 579-597) was what finally
+separated signal from counting tables.
+
+What worked was the noise-subtracted event diff: two heap snapshots with the shop
+closed, one with it open, keep only positions that were stable across the
+baselines and changed on opening. 20-32k blocks of ambient churn, 94 surviving
+positions holding a rare id, 3 clusters, one real.
+
+### Earlier: shop stock NOT FOUND by id search on console
+
+Goal: make shops sell Archipelago items and display whose item each slot holds,
+the way Stardew Valley's traveling merchant works.
+
+Pilot shop **Poppo Showa St.**, 37 items, ids in menu order:
+
+```
+11 12 49 50 51 52 53 55 57 58 59 61 209 69 64 73 72 76 75 94 97
+101 102 103 104 100 106 107 109 111 590 584 597 596 579 585 586
+```
+
+Searched for that list as a contiguous run (u16/u32, strides 2/4/8/16) and as an
+unordered set across:
+
+| Region | Size |
+|---|---|
+| code `0x00010000`-`0x01310768` | 19.0 MB |
+| data `0x01320000`-`0x0172C408` | 4.0 MB |
+| past-data `0x01730000`-`0x02000000` | 8.8 MB |
+
+**Longest contiguous run: 2 of 37.** Nothing.
+
+Two traps worth recording:
+
+- **Small ids match anything.** 30 of the 37 are under 250, so every incrementing
+  table in the binary scores 25-30/37 on a set search. Every "hit" inspected was
+  a counting run like `00 31 00 32 00 33`. Filter to distinctive ids
+  (209, 579-597 here) before believing a match.
+- **Unmapped memory reads as zeros, not errors.** Probes at `0x02000000`-
+  `0x08000000` and `0x10400000`+ return zeros, which is indistinguishable from
+  mapped-but-empty. `0x10000000` holds `DEADBEEFABADCAFE`, an allocator sentinel,
+  but the pages after it are zero.
+
+**PS3MAPI has no memory-map command.** `PROCESS GETMEMORY`, `MEMORY GETMAP` and
+`PROCESS INFO` all return `502 Command not implemented`, so console-side scanning
+is blind guessing at ~1.3 MB/s.
+
+**The way forward is RPCS3.** `ydsrpcs3 regions` enumerates mapped guest memory
+directly, address parity with hardware is already verified, and scanning is
+~2 GB/s instead of 1.3 MB/s. This is exactly the job the emulator-as-lab plan
+exists for. It needs the game running in RPCS3, which has not been set up.
+
 ### Current pool
 
 | | |

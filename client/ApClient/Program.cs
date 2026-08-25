@@ -79,7 +79,11 @@ Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancel.Cancel(); };
 Console.WriteLine("\nwatching. ctrl-c to stop.\n");
 
 await loop.RunAsync(cancel.Token);
-session.Socket.DisconnectAsync().GetAwaiter().GetResult();
+
+// Throws when the socket already closed on us, which is precisely the case
+// after a dropped connection - the one time this line actually runs.
+try { await session.Socket.DisconnectAsync(); }
+catch (Exception) { }
 Console.WriteLine("\ndisconnected.");
 return Finish(0);
 

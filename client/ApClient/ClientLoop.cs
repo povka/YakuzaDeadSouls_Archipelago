@@ -21,6 +21,9 @@ public sealed class ClientLoop(
     private bool _goalSent;
     private int _consecutiveFailures;
     private int _soulPointBaseline = -1;
+    private int _pendingDrop = -1;
+    private int _lastSuppressed = -1;
+    private bool _saveWasLoaded = true;
     private string? _statePath;
 
     public int PollMilliseconds { get; init; } = 2000;
@@ -85,6 +88,29 @@ public sealed class ClientLoop(
 
     private async Task PollAsync()
     {
+        // Title screen or mid-load: every address reads zero. Acting on that
+        // once cost a player their soul points - the baseline adopted 0, then
+        // clawed the real value back down to it after the save reloaded.
+        if (!Addresses.SaveLoaded(game))
+        {
+            if (_saveWasLoaded)
+            {
+                Console.WriteLine("  no save loaded - holding off");
+                _saveWasLoaded = false;
+            }
+            // Re-sample on the next load rather than trusting a stale baseline.
+            _soulPointBaseline = -1;
+            _pendingDrop = -1;
+            await DrainToastsAsync();
+            return;
+        }
+
+        if (!_saveWasLoaded)
+        {
+            Console.WriteLine("  save loaded - resuming");
+            _saveWasLoaded = true;
+        }
+
         await SendKaraokeChecksAsync();
         await SyncAbilitiesAsync();
         ApplyReceivedItems();
@@ -194,6 +220,10 @@ public sealed class ClientLoop(
         {
             GrantSoulPoints(amount);
         }
+        else if (ApIds.MoneyAmount(itemId) is { } yen)
+        {
+            GrantMoney(yen);
+        }
     }
 
     // u8, so it saturates rather than wrapping to nothing.
@@ -204,6 +234,16 @@ public sealed class ClientLoop(
         game.Write(Addresses.SoulPoints, [next]);
         _soulPointBaseline = next;
         Console.WriteLine($"    soul points {current} -> {next}");
+    }
+
+    // u32, so overflow is not a practical concern at 50,000 a time.
+    private void GrantMoney(int yen)
+    {
+        var current = game.ReadU32(Addresses.Money);
+        var next = current + (uint)yen;
+        game.Write(Addresses.Money, [(byte)(next >> 24), (byte)(next >> 16),
+                                     (byte)(next >> 8), (byte)next]);
+        Console.WriteLine($"    money {current:N0} -> {next:N0} yen");
     }
 
     // Soul points come from Archipelago, not from levelling up. There is no way
@@ -230,12 +270,38 @@ public sealed class ClientLoop(
         if (current > _soulPointBaseline)
         {
             game.Write(Addresses.SoulPoints, [(byte)_soulPointBaseline]);
-            Console.WriteLine($"  soul points {current} -> {_soulPointBaseline} (in-game gain suppressed)");
+            if (current != _lastSuppressed)
+            {
+                Console.WriteLine(
+                    $"  soul points {current} -> {_soulPointBaseline} (in-game gain suppressed)");
+                _lastSuppressed = current;
+            }
+            _pendingDrop = -1;
+            return;
         }
-        else if (current < _soulPointBaseline)
+
+        _lastSuppressed = -1;
+
+        // A decrease means the player spent points - but a failed or partial
+        // read also looks like a decrease, and adopting it as the new baseline
+        // is destructive: the next tick treats the real value as an illegal
+        // gain and writes the bad one back. So require two consecutive ticks to
+        // agree before lowering the baseline.
+        if (current < _soulPointBaseline)
         {
-            _soulPointBaseline = current;
+            if (_pendingDrop == current)
+            {
+                _soulPointBaseline = current;
+                _pendingDrop = -1;
+            }
+            else
+            {
+                _pendingDrop = current;
+            }
+            return;
         }
+
+        _pendingDrop = -1;
     }
 
     private void CheckGoal()

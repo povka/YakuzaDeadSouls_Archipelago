@@ -35,6 +35,18 @@ public static class Addresses
     //   ramAddress = saveOffset + SaveToRam
     public const uint SaveToRam = 0x0152F2D0;
 
+    // On the title screen and during a load the whole stats block reads as
+    // zeros, so every value a client might enforce is garbage. One read covers
+    // the block; check it before acting on anything.
+    public static bool SaveLoaded(GameProcess game)
+    {
+        var stats = game.Read(StatsBase, 0x28);
+        var maxHp = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(
+            stats.AsSpan((int)(HealthMax - StatsBase), 2));
+        var level = stats[(int)(Level - StatsBase)];
+        return maxHp > 0 && level > 0;
+    }
+
     public static uint FromSave(uint saveOffset) => saveOffset + SaveToRam;
     public static uint ToSave(uint ramAddress) => ramAddress - SaveToRam;
 }

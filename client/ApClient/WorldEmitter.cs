@@ -33,6 +33,9 @@ public static class WorldEmitter
         for (var r = ApIds.AmmoMin; r <= ApIds.AmmoMax; r++)
             b.AppendLine($"    {Py(ApIds.AmmoItemName(r))}: " +
                          $"({ApIds.AmmoBase + r - ApIds.AmmoMin}, \"filler\"),");
+        for (var i = 0; i < ApIds.MoneyAmounts.Length; i++)
+            b.AppendLine($"    {Py(ApIds.MoneyItemName(ApIds.MoneyAmounts[i]))}: " +
+                         $"({ApIds.MoneyBase + i}, \"filler\"),");
         b.AppendLine("}");
         b.AppendLine();
 
@@ -40,12 +43,51 @@ public static class WorldEmitter
         b.AppendLine("# location name -> id");
         b.AppendLine("LOCATION_TABLE = {");
         for (var song = 0; song < ApIds.SongNames.Length; song++)
+        {
+            if (!ApIds.Reachable(ApIds.SongCharacters[song])) continue;
             for (var tier = 0; tier < ApIds.ScoreTiers.Length; tier++)
                 b.AppendLine($"    {Py(ApIds.KaraokeLocationName(song, ApIds.ScoreTiers[tier]))}: " +
                              $"{ApIds.KaraokeLocationId(song, tier)},");
+        }
         for (var i = 0; i < Abilities.Count; i++)
             b.AppendLine($"    {Py(ApIds.AbilityLocationName(Abilities.All[i].Name))}: " +
                          $"{ApIds.AbilityLocationId(i)},");
+        b.AppendLine("}");
+        b.AppendLine();
+
+        // --- character scoping ---
+        b.AppendLine("# Bit per character. An item may sit at a location only when every");
+        b.AppendLine("# character who needs it can reach that location - see MayPlace in ApIds.cs.");
+        b.AppendLine($"CHAR_NONE = {(int)ApIds.Characters.None}");
+        b.AppendLine($"CHAR_AKIYAMA = {(int)ApIds.Characters.Akiyama}");
+        b.AppendLine($"CHAR_MAJIMA = {(int)ApIds.Characters.Majima}");
+        b.AppendLine($"CHAR_GODA = {(int)ApIds.Characters.Goda}");
+        b.AppendLine($"CHAR_KIRYU = {(int)ApIds.Characters.Kiryu}");
+        b.AppendLine($"CHAR_FINALE = {(int)ApIds.Characters.Finale}");
+        b.AppendLine();
+
+        b.AppendLine("# location name -> characters who can reach it");
+        b.AppendLine("LOCATION_CHARACTERS = {");
+        for (var song = 0; song < ApIds.SongNames.Length; song++)
+        {
+            if (!ApIds.Reachable(ApIds.SongCharacters[song])) continue;
+            foreach (var tier in ApIds.ScoreTiers)
+                b.AppendLine($"    {Py(ApIds.KaraokeLocationName(song, tier))}: " +
+                             $"{(int)ApIds.SongCharacters[song]},");
+        }
+        for (var i = 0; i < Abilities.Count; i++)
+            b.AppendLine($"    {Py(ApIds.AbilityLocationName(Abilities.All[i].Name))}: " +
+                         $"{(int)ApIds.Characters.Akiyama},");
+        b.AppendLine("}");
+        b.AppendLine();
+
+        b.AppendLine("# item name -> characters who need it (0 = anyone)");
+        b.AppendLine("ITEM_CHARACTERS = {");
+        b.AppendLine($"    {Py("Erika's Business Card")}: {(int)ApIds.ItemCharacters(ApIds.ErikaCard)},");
+        b.AppendLine($"    {Py("Yuna's Business Card")}: {(int)ApIds.ItemCharacters(ApIds.YunaCard)},");
+        for (var i = 0; i < Abilities.Count; i++)
+            b.AppendLine($"    {Py(Abilities.All[i].Name)}: " +
+                         $"{(int)ApIds.ItemCharacters(ApIds.AbilityItemId(i))},");
         b.AppendLine("}");
         b.AppendLine();
 
@@ -65,6 +107,7 @@ public static class WorldEmitter
         // ranges rather than one flat list - a uniform choice over every variant
         // would weight ammo 20:1 against soul points.
         b.AppendLine($"AMMO_MIN, AMMO_MAX = {ApIds.AmmoMin}, {ApIds.AmmoMax}");
+        b.AppendLine($"MONEY_AMOUNTS = ({string.Join(", ", ApIds.MoneyAmounts)},)");
         b.AppendLine($"SOUL_POINTS_MIN, SOUL_POINTS_MAX = {ApIds.SoulPointsMin}, {ApIds.SoulPointsMax}");
         b.AppendLine();
         b.AppendLine("# Exactly enough soul points to buy every ability. The world splits the");
@@ -77,6 +120,9 @@ public static class WorldEmitter
         b.AppendLine();
         b.AppendLine("def soul_points_item_name(amount):");
         b.AppendLine("    return f\"Soul Points ({amount})\"");
+        b.AppendLine();
+        b.AppendLine("def money_item_name(yen):");
+        b.AppendLine("    return f\"{yen:,} Yen\"");
         return b.ToString();
     }
 
