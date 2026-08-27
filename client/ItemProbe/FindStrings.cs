@@ -104,20 +104,27 @@ public static class FindStrings
         {
             var end = Array.IndexOf(raw, (byte)0, pos);
             if (end < 0) break;
-            var text = Encoding.ASCII.GetString(raw, pos, end - pos);
+            var start = pos;
+            var span = raw.AsSpan(start, end - start);
             pos = end + 1;
 
-            if (text.Length == 0) continue;
-            if (!text.All(c => c >= 0x20 && c < 0x7F))
+            if (span.Length == 0) continue;
+
+            // Validate the bytes, never the decoded string: the old check ran on
+            // ASCII output, where every rejected byte had already become '?' - a
+            // character the check itself accepted.
+            var bad = GameText.FirstUnmappedByte(span);
+            if (bad >= 0)
             {
-                Console.WriteLine($"  -- stopped at id {id}: non-ascii entry --");
+                Console.WriteLine($"  -- stopped at id {id}: unmapped byte 0x{bad:X2} --");
                 break;
             }
 
+            var text = GameText.Decode(span);
             if (asCode)
                 Console.WriteLine($"{id}	{text}");
             else
-                Console.WriteLine($"  {id,4}  0x{at + (uint)(pos - text.Length - 1):X8}  {text}");
+                Console.WriteLine($"  {id,4}  0x{at + (uint)start:X8}  {text}");
             id++;
             emitted++;
         }

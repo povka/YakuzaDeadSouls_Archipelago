@@ -94,9 +94,42 @@ needs no address.
 
 | File | Contents |
 |---|---|
-| `data/items.tsv` | 1128 entries, ids 0-1127, dumped from the game's name table |
+| `data/items.tsv` | 1128 entries, ids 0-1127, dumped from the game's name table at `0x30DEE4DC` (RPCS3) |
 | `data/ability_bits.tsv` | address + bit + name for all 39 of Akiyama's abilities |
 | `data/ability_names_alt.tsv` | a 69-entry ability string table that is **not** the menu list; kept because it is real, but it does not match bit order |
+
+### Game text encoding
+
+Strings are **Shift-JIS structurally** — `0x81`-`0x9F` and `0xE0`-`0xEF` are lead
+bytes of a double-byte pair — but the EU release **repurposes Shift-JIS's
+single-byte half-width katakana range (`0xA1`-`0xDF`) as accented Latin glyphs**
+through its font. Only four appear in the item table:
+
+| byte | game draws | Shift-JIS would decode as |
+|---|---|---|
+| `0xB1` | `à` | `ｱ` |
+| `0xB2` | `é` | `ｲ` |
+| `0xB3` | `°` | `ｳ` |
+| `0xB4` | `ê` | `ｴ` |
+
+So no stock codec decodes this correctly: UTF-8, Latin-1 and CP1252 are all
+wrong, and plain Shift-JIS gives katakana where accents belong. `GameText.Decode`
+in `client/Ps3Mapi/GameText.cs` handles it; the map is a stub of 4 of a possible
+63, so other string pools will need extending.
+
+Two entries are Japanese section markers, not items: id 639 `ぶきかいし`
+(*weapons start*, just after `Anti-Tank Missile Launcher`) and id 765
+`ぼうぐかいし` (*armour start*, just after `End of weapons`). Ids 0 and 1 are a
+full-width space `U+3000`; `Empty` and `Locked Inventory Slot` are hand-written
+and must survive any re-dump.
+
+**Two independent `?` machines cost three days here.** `Encoding.ASCII.GetString`
+substitutes rather than throwing, so every high byte silently became `?` — and
+the guard meant to catch it ran on the *decoded* string, where `?` (`0x3F`)
+passed its own `0x20..0x7F` test. Validate bytes, never decoded text, and walk
+them the way the decoder does or trail bytes read as unmapped. Separately,
+`Console.OutputEncoding` defaults to the OEM codepage on Windows and re-mangles
+accents on the way out, redirects included.
 
 ---
 
@@ -1876,16 +1909,50 @@ are obtainable during Akiyama's chapters is unknown. Creating locations for item
 a build cannot reach is the same bug just fixed for karaoke songs, at ten times
 the scale.
 
-### SOLVED: the shop stock table
+### SOLVED: the loaded-resource table finds the shop by filename
 
-Found in RPCS3 after console scanning failed. Reached through a **static
-pointer**, so it works on hardware too:
+The route to the shop is a **resource table in static data** listing every file
+the game currently has open, each with its path and a pointer to the parsed data.
+Verified on **console**:
 
 ```
-[0x01612CD8]  -> shop header (heap)
-   header +0x08  u16  entry count      (37 for Poppo Showa St.)
-   header +0x0C  u32  -> entry table
-   header +0x10  u32[] UI string pointers ("Cancel", "Total") - not item names
+resource table  base 0x0160F0F0, stride 0x188, ~64 entries
+   +0x00  u32   slot id
+   +0x30  u32   -> parsed data
+   +0x68  char* file path, NUL-terminated ASCII
+```
+
+Entry 41 on the test console:
+
+```
+0x01612FB8   ->  0x3554E080   data/wdr/shop/shop0006.bin
+```
+
+So the client finds a shop by **name**, not by chasing heap pointers: read the
+table, look for a path containing `/wdr/shop/`, follow `+0x30`. The filename also
+identifies *which* shop — `shop0006.bin` is Poppo Showa St. — which is exactly
+what location names need.
+
+The table lists everything loaded: `chara.par`, `st_kamuro.par`, motion files,
+item icons, `uid00ee006e.msg`. Useful well beyond shops.
+
+**Do not use a fixed pointer address.** An earlier attempt keyed on `0x01612CD8`
+because that is where the header pointer sat in RPCS3; on console the same shop
+was at `0x01612FE8`. The resource table assigns whatever slot is free, so the
+entry index and therefore the pointer address both move. Scan the table.
+
+**Heap addresses differ between console and RPCS3.** The same shop's entry table
+was at `0x3554E4F8` in the emulator and `0x3554E278` on hardware. The verified
+address parity covers the **static segments only** - do not assume it for heap
+allocations.
+
+#### The shop header and entry table
+
+```
+shop header (from resource +0x30)
+   +0x08  u16  entry count      (37 for Poppo Showa St.)
+   +0x0C  u32  -> entry table
+   +0x10  u32[] UI string pointers ("Cancel", "Total") - not item names
 
 entry table, 0x20 per record, in menu order:
    +0x00  u16  item id
@@ -1910,7 +1977,94 @@ and that entry 0 holds a valid item id.
 Stock is **static across characters and parts** - identical in Akiyama's Part 1
 and Kiryu's Part 4.
 
+### SOLVED: the shop display list - AP items shown on console
+
+The parsed file data is **not** what the screen draws. Opening the Buy menu
+builds a separate **display list**, and that is what the renderer reads.
+Confirmed on hardware: names, prices and descriptions all change live.
+
+```
+display list, 0x38 (56) bytes per row, one per shop slot, in menu order
+   +0x00  u32  -> the source entry in the parsed table
+   +0x08  u16  item id
+   +0x14  u32  price          <- what the screen shows
+   +0x20  u32  8
+   +0x2C  u32  -> name string  <- what the screen shows
+   +0x30  u32  -> description string
+```
+
+#### Finding it without hardcoded addresses
+
+1. Resource table at `0x0160F0F0`, stride `0x188`: find the entry whose path at
+   `+0x68` contains `/wdr/shop/`; its `+0x30` is the shop header.
+2. Header `+0x08` = entry count, `+0x0C` = parsed entry table.
+3. The display list sits **near the parsed table** — search a window of roughly
+   `table - 0x2000` to `table + 0x6000` for `0x38`-stride rows whose `+0x08` ids
+   match the parsed table's ids in order.
+
+Verified end to end on console: `shop0006.bin` -> header `0x3554E300` -> parsed
+table `0x3554E4F8` -> display list `0x3554F9B0`, then five rows rewritten to real
+items from a live seed (`Master Form (asapaska-KH2)`, `Video Gaming Skill
+(shishi-sims)`, ...) with prices of 1, 420, 67, 12345, 999. All appeared on the
+TV.
+
+**Name strings have no spare room** (`'Tauriner'` is 8 bytes in a packed pool), so
+the AP name is written into that row's **description buffer** — 60-90 bytes, ample
+— and `+0x2C` is repointed at it. The description is sacrificed; it was going to
+be replaced anyway.
+
+#### Why the earlier attempts failed
+
+Everything written to the parsed table had no visible effect, across scrolling,
+re-entering Buy, leaving the shop and reloading the save. The parsed table is
+real, matches the menu exactly, and is simply not the render source.
+
+The diff that found it worked because the **baseline was right**: two snapshots at
+the shopkeeper prompt versus one with the Buy list open. An earlier diff compared
+*outside the shop* against *Buy open*, which bundles the file being parsed with
+the menu being built and buries the smaller structure under the louder one.
+
+`pokebytes` and `pokestr` were added to `ydsitems` for this - `poke` only writes
+numbers.
+
+#### BLOCKED: editing the table has no visible effect
+
+Writing to the entry table works and reads back correctly, but **the shop screen
+does not change**. Tested on console with the shop open and untouched:
+
+- Prices for slots 0-3 set to `99999`, verified by re-reading. Screen still showed
+  250 / 850 / 420 / 180.
+- Description strings overwritten in place with Archipelago item names, verified
+  by re-reading. Screen still showed the original descriptions.
+
+So this structure is the **parsed contents of `shop0006.bin`**, not what the
+renderer draws from. Ruled out so far:
+
+- **Not a static price table.** Searching the whole data segment for any 64-byte
+  window pairing an item id with its shop price returned **zero** hits, so prices
+  are not coming from a fixed table either.
+- **Not a second copy at the same layout.** The cluster at `0x3554E8B8` that
+  looked like a rival table is `0x3554E4F8 + 0x3C0`, i.e. record 30 of the same
+  array - the rare ids simply live at the end of it.
+
+The allocation is also **transient**: after closing the shop, `0x3554E278` held
+`shop0006.bin` and `" you. That comes to %s."`, so it is freed and reused. Edits
+must be made and observed within one shop session.
+
+Two hypotheses remain, and the console cannot distinguish them:
+
+1. The UI builds its display list when the menu opens, so any later edit is
+   ignored. Writing would have to happen between the file being parsed and the
+   first frame.
+2. There is a further copy the renderer owns, not yet found.
+
+**Next tool is RPCS3's debugger**, not another scan - a write/read breakpoint on
+the price field answers "what reads this" directly. That is the "understanding
+*why*" job the emulator-as-lab plan reserved it for.
+
 #### What this enables
+
+
 
 Rewriting `+0x00` changes what a slot sells, `+0x10`/`+0x14` changes the price,
 and `+0x18` repoints the description - which is the route to showing which
@@ -1973,6 +2127,173 @@ is blind guessing at ~1.3 MB/s.
 directly, address parity with hardware is already verified, and scanning is
 ~2 GB/s instead of 1.3 MB/s. This is exactly the job the emulator-as-lab plan
 exists for. It needs the game running in RPCS3, which has not been set up.
+
+### Ability costs and prerequisites
+
+`data/ability_bits.tsv` now carries five columns:
+
+```
+address <TAB> bit <TAB> name <TAB> cost <TAB> requires
+```
+
+**Real total cost: 236 soul points** across the 39 abilities, replacing the 239
+estimate (255 minus 16 left over) - close, the difference being points earned
+while buying.
+
+Prerequisites, 23 of 39:
+
+- Stated by the player: `Throw Off`, `Roundhouse Kick`, `Leg Sweep`,
+  `Break-Away Kick` need **Shoulder Charge**; `Iron Arm`, `Unarmed Expertise`
+  need **Super Grip**.
+- Derived from the tier families (`X: Enhanced -> Advanced -> Super` etc.), which
+  follow file order within a `prefix: tier` name.
+
+**Not modelled, deliberately:** `Head Lock-On` after `Head Tracking` and
+`Unarmed Mastery` after `Unarmed Expertise` look like chains but were not stated.
+Guessing would over-restrict at best and produce a broken seed at worst.
+
+#### Prerequisite abilities must be `progression`
+
+The first attempt made every ability `useful` and generation failed with every
+location unreachable. **Archipelago's fill only tracks `progression` items when
+computing reachability** - a location requiring a `useful` item is treated as
+permanently unreachable.
+
+Now an ability that appears as another's prerequisite is emitted as
+`progression`; the rest stay `useful`. 21 progression items in total (19
+gating abilities plus the 2 hostess cards). 5/5 seeds generate.
+
+#### Known logic hole: soul points are not modelled
+
+Buying an ability costs soul points, and the client suppresses the in-game
+supply, so points come only from Archipelago. **Nothing expresses that in the
+logic**, so the fill is free to place every soul-point item behind an ability
+check - which needs points to reach. Karaoke and shop checks cost no points, so
+a total deadlock is unlikely rather than impossible.
+
+Options, none implemented: forbid soul points on ability locations; require a
+minimum count of soul-point items per ability location; or make soul points
+progression and gate ability locations on holding some.
+
+### The wdr.par archive: 46 shop files, but not usable as the source of truth
+
+`data/wdr_par/wdr.par` is 11 MB and fetches over webMAN HTTP in **0.75 s**. It
+contains **46 shop definitions**, `shop0000.bin` through `shop0045.bin`.
+
+PARC layout, decoded:
+
+```
+0x00  "PARC"
+0x10  u32 directory count (6)      0x14  u32 directory table offset
+0x18  u32 file count (4434)        0x1C  u32 file table offset (0x456E0)
+
+name table   starts at 0x20, 64 bytes per entry, NUL-padded ASCII
+file table   0x20 per entry: flags, size, compressed size, offset, ..., timestamp
+```
+
+Shop files are **uncompressed** (size == compressed size), so SLLZ is not in the
+way. Each has the same header shape as the in-memory version, with file-relative
+offsets in place of pointers: `+0x0C` is the entry table, `0x20` per record.
+
+**But the contents do not match what the shop displays.** Scanning all 4434 files
+for an entry table beginning with Poppo's stock (`11, 12, 49, 50, 51, 52, 53`)
+returned **zero** hits. Files near the right index decode to coherent but
+different stock — armour and accessories, or Staminan variants Poppo does not
+sell. So the displayed list is assembled or filtered from the file rather than
+copied, and the archive cannot be used to enumerate shop contents.
+
+Also note the name table includes the 6 directory entries while the file table
+does not, so name index and file index are offset - and matching them by a fixed
+shift did not produce the right file either.
+
+**Practical route instead: read shops from memory as they are visited.**
+`ydsitems shopwatch` polls for an open shop and appends
+`file <TAB> slots <TAB> id:price,...` to `data/shops.tsv`, skipping ones already
+recorded. Walking Kamurocho with it running collects every shop reliably, which
+the archive route did not.
+
+### Shop files that exist but must not be locations
+
+Identified 2026-08-27 and recorded in `data/shops.tsv` with `available = no` and
+`slots = 0`, so `LoadShops` skips them twice over. They are listed rather than
+omitted so nobody maps them again:
+
+| File | What it is | Why not |
+|---|---|---|
+| `shop0008.bin` | hostess **drink** menu | buying is part of hostess progression, not shopping |
+| `shop0009.bin` | hostess **food** menu | same |
+| `shop0015.bin` | Le Marche **during a date** | a second display of `shop0014`; its slots would double-count, and it is only reachable mid-date |
+
+Adding rows to `shops.tsv` is safe at any position: unavailable rows are skipped
+before the list is built, so shop indices - and therefore every shop location id
+- do not move. Verified by diffing all 267 shop ids before and after.
+
+`shop0013.bin` is still unidentified.
+
+### All of Akiyama's shops
+
+`data/shops.tsv` is the source, written by `ydsitems shopwatch` as the player
+walks into each shop. Columns: `file, name, slots, available, excluded, stock`.
+
+| Shop | File | Slots | |
+|---|---|---|---|
+| Poppo Tenkaichi St. | `shop0004.bin` | 35 | **excluded** |
+| Poppo Nakamichi St. | `shop0005.bin` | 31 | |
+| Poppo Showa St. | `shop0006.bin` | 37 | |
+| M Store | `shop0007.bin` | 33 | |
+| Kotobuki Drugs | `shop0010.bin` | 13 | |
+| Ebisu Pawn Kamurocho | `shop0011.bin` | 13 | |
+| Don Quijote | `shop0012.bin` | 50 | |
+| Le Marche | `shop0014.bin` | 55 | |
+
+**267 slots, all usable as checks.** Gambling halls and other shop-like venues
+are not included; these are the actual shops.
+
+**Tenkaichi St. is `LocationProgressType.EXCLUDED`.** It sits inside a quarantine
+zone from chapter 2 of Akiyama's part, so its slots stop being reachable. They
+still exist as checks, but Archipelago will not route anything needed through
+them. Using the built-in EXCLUDED rather than a custom item rule also means
+trackers show them as optional.
+
+### Filler is three kinds now
+
+| Kind | Items | Notes |
+|---|---|---|
+| Ammo | 6 types x 1-200 rounds = 1200 | Shotgun, Gatling, Submachine, Rifle, Anti-Materiel, Grenade Launcher; ids `BaseId+20000 + type*200 + rounds-1` |
+| Money | 53 | 67, 69, 420, then 1,000-50,000 in thousands |
+| Vanilla shop goods | 158 | every distinct item the shops normally sell; ids `BaseId+30000 + gameItemId` |
+
+`get_filler_item_name` picks the kind first (~35/35/30), then the detail.
+
+**Current pool: 310 locations, 1462 item types.** 5/5 seeds generate.
+
+### The tutorial softlock, and how it is handled
+
+Akiyama's tutorial will not continue until he **owns** an ability. Two separate
+pieces of the client each broke that, and both had to be fixed:
+
+1. **`EnforceSoulPoints` confiscated the point that pays for it.** Points now flow
+   freely until the first ability check is sent.
+2. **`SyncAbilities` cleared the bit as soon as the purchase was reported**, so
+   the player bought an ability and immediately owned nothing. The first
+   purchase now also grants **one ability for good**, chosen at random and
+   seeded off the room so a restart picks the same one.
+
+**Key the first fix on "has an ability check been sent", not "does the player own
+an ability".** `SyncAbilities` clears the bit after every purchase, so an
+ownership test flips back to false each time and the point tap reopens - the
+player could farm soul points indefinitely. A sent check never un-sends.
+
+The granted ability consumes nothing: the matching Archipelago item is still in
+the pool for someone to find. It is persisted as a second line in
+`apstate/<seed>_<slot>.txt`, and the client recovers a save that reported a
+purchase before this existed.
+
+**The pool is 1 point smaller than the total cost.** All 39 abilities cost 236,
+but the tutorial purchase is paid with an in-game point the client deliberately
+allows through, so Archipelago supplies **235**. `TutorialPurchaseCost` is the
+cheapest ability's cost rather than a literal 1, so it stays right if costs
+change.
 
 ### Current pool
 
@@ -2127,6 +2448,27 @@ the one the game acts on.
 The general rule both cases point at: **a write that visibly "works" proves only
 what that one address feeds.** It does not prove the address is the real value.
 Confirm behaviour, not just pixels - fire the gun, do not just read the number.
+
+### Stale RAM is well-formed, so validity checks cannot catch it
+
+`Addresses.SaveLoaded` was written on the observation that the stats block reads
+zero at the title screen. That holds on a cold boot. It does **not** hold after
+returning to the title from a played session: measured on console at the main
+menu, `HealthMax = 0x012C`, `Level = 2`, and the ability bit for Head Tracking
+still set. A perfectly valid save that simply is not the one being played.
+
+The client acted on it and reported a purchase the player never made, on a seed
+they had not started. The general rule: **an absolute reading cannot tell you a
+player did something.** Only a transition can. Every check driven by persistent
+state now adopts a baseline on its first sample and reports only what changes
+afterwards - abilities (`_abilityBaseline`), karaoke (`_karaokeBaseline`), the
+goal (`_goalPrev`), matching what `_soulPointBaseline` already did.
+
+The cost is deliberate and accepted: progress made while the client is closed is
+never reported. A song sung above the tier offline has to be sung again.
+
+The gate itself is still wrong. A real "in gameplay" flag has not been found, so
+the baselines are what stands between a stale save and a false check.
 
 ### Displays can lag the memory
 
@@ -2338,6 +2680,71 @@ flag-byte + literal/match LZ77 — sixteen combinations of flag polarity, offset
 width (11/12/13 bits), offset base and length base all failed to produce a full
 decode. Entries stored with flags `0` are readable directly and are the way in
 where one exists.
+
+### SOLVED: hostess storyline completion, and the goal it replaces
+
+The fancy business card means **20 hearts**, not the end of the storyline. After
+it the hostess calls, you play out a final event, and then **an email arrives -
+reading that email is what completes her**. The Completion List only moves on the
+email, not on the event.
+
+Per-hostess record, stride `0x80`:
+
+| Field | Offset | Erika `0x0153128C` | Yuna `0x0153130C` |
+|---|---|---|---|
+| availability u32 | `+0x00` | `09C5A665` | `00000001` |
+| progress bits | `+0x05` | `0x6F` complete | `0x00` just started |
+
+Confirmed causally: poking Erika's `+0x05` from `0x6F` back to `0x21` (its
+20-hearts value) drops the Completion List from 001/007 to 000/007, and back.
+`0x40` is the bit that appears on completion.
+
+**`Hostesses.AvailableFlag` was wrong.** It pointed at `0x0153128F`, which is
+merely the low byte of the availability u32 - nonzero for both hostesses, so
+`IsAvailable` worked by accident. `SetAvailable` wrote a literal `1` there, which
+on a started hostess would have turned `09C5A665` into `09C5A601` and destroyed
+three bytes of her record. It now reads and writes the full u32 and refuses to
+overwrite a non-empty one.
+
+**Do not use `0x01534A20` for any of this.** It looks like a per-hostess record -
+floats, a `0x00000001` that goes up exactly when completion does, a matching
+block `0xF0` earlier - and it is a **scratch buffer for whichever hostess you are
+currently sitting with**. Starting Yuna overwrote it with her data and Erika's
+`1` became `0` while she was still complete. Two poke tests against it produced
+null results before this was spotted.
+
+### Abilities are items, never checks
+
+One bit means both "the menu shows this as bought" and "the effect is live".
+There is no second table to split them (see below), so the client cannot let the
+UI keep an ability whose effect it has disabled - that would need patching the
+code behind each of the 39 bits.
+
+The hybrid design that followed from that was worse than it looked. An ability
+was a location *and* an item, so the client had to clear a bit the player had
+paid for, and the ability vanished from the menu. Worse in the other direction:
+an ability granted by Archipelago set the bit, which meant the player could no
+longer buy it, which made that location permanently unreachable - and the fill
+had no idea, so anything it placed there could strand the seed.
+
+Settled 2026-08-27: **abilities are items only.** Bits are only ever turned ON,
+so nothing disappears from the menu. Soul points are pinned to 1 before the
+tutorial purchase and 0 after, which is the only thing stopping the player
+buying abilities the multiworld has not sent. Soul points are no longer items
+and ability locations no longer exist, which also removed the self-cancelling
+pool problem the old design had.
+
+### Level-ups are the replacement locations
+
+Level is a u8 at `0x0154BDC4`. Every level from 2 to **100** is emitted into the
+datapackage so ids never move between seeds, and the YAML option
+`max_level_check` (default 20) decides how many actually become locations. The
+world filters `LOCATION_TABLE` through `LEVEL_LOCATIONS` in `_active_locations`;
+the client refuses to report a level whose id is not in this slot.
+
+The cap matters more than it looks: Archipelago models nothing about how hard
+levelling is, so a level the player never reaches is a check they can never
+make, and the fill will put a hostess card behind it.
 
 ### The ability bitfield at `0x01530210`
 

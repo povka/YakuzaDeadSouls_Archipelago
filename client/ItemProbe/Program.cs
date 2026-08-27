@@ -1,5 +1,10 @@
 using System.Buffers.Binary;
+using System.Text;
 using YakuzaDeadSouls.Ps3;
+
+// Without this the console (and any redirect) encodes in the OEM codepage, which
+// turns every accented character back into the '?' this decoder exists to avoid.
+Console.OutputEncoding = new UTF8Encoding(false);
 
 if (args.Length < 1) { Usage(); return 0; }
 
@@ -106,6 +111,98 @@ switch (command)
         target.WriteMemory(from, buf);
         Console.WriteLine($"  after   {Convert.ToHexString(target.ReadMemory(from, Math.Min(len, 32)))}");
         Console.WriteLine($"  wrote 0x{fill:X2} over {len} bytes, 0x{from:X8}-0x{to:X8}");
+        break;
+    }
+    case "shop":
+    {
+        if (target is not GameProcess gp) { Console.WriteLine("shop needs the console or rpcs3 game process"); break; }
+        var found = Shops.Find(gp);
+        if (found is null) { Console.WriteLine("no shop open - stand in a shop's buy menu"); break; }
+        var sh = found.Value;
+        var slots = sh.SlotCount;
+        Console.WriteLine($"file       {sh.File}");
+        Console.WriteLine($"slots      {slots}");
+        Console.WriteLine($"display    0x{sh.DisplayList:X8}");
+        var ids = Shops.ItemIds(gp, sh, slots);
+        var rows = gp.Read(sh.DisplayList, slots * Shops.RowStride);
+        Console.WriteLine();
+        Console.WriteLine("slot   id  price   item");
+        for (var i = 0; i < slots; i++)
+        {
+            var price = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(
+                rows.AsSpan(i * Shops.RowStride + Shops.RowPrice, 4));
+            var nm = Inventory.KnownItems.TryGetValue(ids[i], out var known) ? known : "?";
+            Console.WriteLine($"  {i,2} {ids[i],4} {price,6}   {nm}");
+        }
+        Console.WriteLine();
+        Console.WriteLine("paste into ApIds.ShopDefs:");
+        Console.WriteLine($"    new(\"{sh.File}\", \"NAME HERE\", {slots}, Characters.AllParts),");
+        break;
+    }
+    case "shopwatch":
+    {
+        if (target is not GameProcess gw) { Console.WriteLine("shopwatch needs the game process"); break; }
+        var outPath = Path.Combine(
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "data")),
+            "shops.tsv");
+        var seen = new HashSet<string>();
+        if (File.Exists(outPath))
+            foreach (var line in File.ReadLines(outPath))
+            {
+                var tab = line.IndexOf('	');
+                if (tab > 0) seen.Add(line[..tab]);
+            }
+        Console.WriteLine($"watching for shops. {seen.Count} already recorded in {Path.GetFileName(outPath)}.");
+        Console.WriteLine("walk into each shop and open the buy menu. ctrl-c to stop.");
+        Console.WriteLine();
+        while (true)
+        {
+            try
+            {
+                var sh = Shops.Find(gw);
+                if (sh is not null && seen.Add(sh.Value.File))
+                {
+                    var v = sh.Value;
+                    var ids = Shops.ItemIds(gw, v, v.SlotCount);
+                    var rows = gw.Read(v.DisplayList, v.SlotCount * Shops.RowStride);
+                    var parts = new List<string>();
+                    for (var i = 0; i < v.SlotCount; i++)
+                    {
+                        var price = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(
+                            rows.AsSpan(i * Shops.RowStride + Shops.RowPrice, 4));
+                        parts.Add($"{ids[i]}:{price}");
+                    }
+                    var line = string.Join("	", v.File, v.SlotCount.ToString(), string.Join(",", parts));
+                    File.AppendAllText(outPath, line + Environment.NewLine);
+                    Console.WriteLine($"  + {v.File}  {v.SlotCount} slots");
+                    for (var i = 0; i < Math.Min(v.SlotCount, 4); i++)
+                        Console.WriteLine($"      {(Inventory.KnownItems.TryGetValue(ids[i], out var n) ? n : "?")}");
+                }
+            }
+            catch (Ps3Exception) { }
+            Thread.Sleep(1500);
+        }
+    }
+    case "pokebytes":
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var addr = Convert.ToUInt32(bare[0], 16);
+        var bytes = Convert.FromHexString(bare[1]);
+        Console.WriteLine($"  before  {Convert.ToHexString(target.ReadMemory(addr, bytes.Length))}");
+        target.WriteMemory(addr, bytes);
+        Console.WriteLine($"  after   {Convert.ToHexString(target.ReadMemory(addr, bytes.Length))}");
+        break;
+    }
+    case "pokestr":
+    {
+        var bare = rest.Where(a => !a.StartsWith("--")).ToArray();
+        var addr = Convert.ToUInt32(bare[0], 16);
+        var text = bare[1];
+        var pad = bare.Length > 2 ? int.Parse(bare[2]) : text.Length + 1;
+        var buf = new byte[pad];
+        System.Text.Encoding.UTF8.GetBytes(text).CopyTo(buf, 0);
+        Console.WriteLine($"  writing {pad} bytes at 0x{addr:X8}: {text}");
+        target.WriteMemory(addr, buf);
         break;
     }
     case "poke":

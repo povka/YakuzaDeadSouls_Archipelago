@@ -25,14 +25,22 @@ public static class WorldEmitter
         b.AppendLine("ITEM_TABLE = {");
         b.AppendLine($"    {Py("Erika's Business Card")}: ({ApIds.ErikaCard}, \"progression\"),");
         b.AppendLine($"    {Py("Yuna's Business Card")}: ({ApIds.YunaCard}, \"progression\"),");
+        // Abilities are items only - nothing gates on them, so nothing needs to
+        // be `progression`.
         for (var i = 0; i < Abilities.Count; i++)
             b.AppendLine($"    {Py(Abilities.All[i].Name)}: ({ApIds.AbilityItemId(i)}, \"useful\"),");
-        for (var a = ApIds.SoulPointsMin; a <= ApIds.SoulPointsMax; a++)
-            b.AppendLine($"    {Py(ApIds.SoulPointsItemName(a))}: " +
-                         $"({ApIds.SoulPointsBase + a - ApIds.SoulPointsMin}, \"useful\"),");
-        for (var r = ApIds.AmmoMin; r <= ApIds.AmmoMax; r++)
-            b.AppendLine($"    {Py(ApIds.AmmoItemName(r))}: " +
-                         $"({ApIds.AmmoBase + r - ApIds.AmmoMin}, \"filler\"),");
+        for (var t = 0; t < ApIds.AmmoTypes.Length; t++)
+            for (var r = ApIds.AmmoMin; r <= ApIds.AmmoMax; r++)
+                b.AppendLine($"    {Py(ApIds.AmmoItemName(t, r))}: " +
+                             $"({ApIds.AmmoItemId(t, r)}, \"filler\"),");
+        foreach (var id in ApIds.VanillaShopItems)
+        {
+            var nm = Inventory.KnownItems.TryGetValue(id, out var known) ? known : null;
+            if (nm is null || Inventory.IsPlaceholder(nm)) continue;
+            b.AppendLine($"    {Py(nm)}: ({ApIds.GameItemId(id)}, \"filler\"),");
+        }
+        foreach (var (id, name) in ApIds.Guns)
+            b.AppendLine($"    {Py(name)}: ({ApIds.GameItemId(id)}, \"useful\"),");
         for (var i = 0; i < ApIds.MoneyAmounts.Length; i++)
             b.AppendLine($"    {Py(ApIds.MoneyItemName(ApIds.MoneyAmounts[i]))}: " +
                          $"({ApIds.MoneyBase + i}, \"filler\"),");
@@ -49,9 +57,17 @@ public static class WorldEmitter
                 b.AppendLine($"    {Py(ApIds.KaraokeLocationName(song, ApIds.ScoreTiers[tier]))}: " +
                              $"{ApIds.KaraokeLocationId(song, tier)},");
         }
-        for (var i = 0; i < Abilities.Count; i++)
-            b.AppendLine($"    {Py(ApIds.AbilityLocationName(Abilities.All[i].Name))}: " +
-                         $"{ApIds.AbilityLocationId(i)},");
+        for (var level = 2; level <= ApIds.MaxLevel; level++)
+            b.AppendLine($"    {Py(ApIds.LevelLocationName(level))}: " +
+                         $"{ApIds.LevelLocationId(level)},");
+        for (var sh = 0; sh < ApIds.ShopDefs.Length; sh++)
+        {
+            var def = ApIds.ShopDefs[sh];
+            if (!ApIds.Reachable(def.Who)) continue;
+            for (var slot = 0; slot < def.Slots; slot++)
+                b.AppendLine($"    {Py(ApIds.ShopLocationName(def, slot))}: " +
+                             $"{ApIds.ShopLocationId(sh, slot)},");
+        }
         b.AppendLine("}");
         b.AppendLine();
 
@@ -75,9 +91,16 @@ public static class WorldEmitter
                 b.AppendLine($"    {Py(ApIds.KaraokeLocationName(song, tier))}: " +
                              $"{(int)ApIds.SongCharacters[song]},");
         }
-        for (var i = 0; i < Abilities.Count; i++)
-            b.AppendLine($"    {Py(ApIds.AbilityLocationName(Abilities.All[i].Name))}: " +
+        for (var level = 2; level <= ApIds.MaxLevel; level++)
+            b.AppendLine($"    {Py(ApIds.LevelLocationName(level))}: " +
                          $"{(int)ApIds.Characters.Akiyama},");
+        for (var sh = 0; sh < ApIds.ShopDefs.Length; sh++)
+        {
+            var def = ApIds.ShopDefs[sh];
+            if (!ApIds.Reachable(def.Who)) continue;
+            for (var slot = 0; slot < def.Slots; slot++)
+                b.AppendLine($"    {Py(ApIds.ShopLocationName(def, slot))}: {(int)def.Who},");
+        }
         b.AppendLine("}");
         b.AppendLine();
 
@@ -91,10 +114,24 @@ public static class WorldEmitter
         b.AppendLine("}");
         b.AppendLine();
 
+        // Empty now that abilities are items only. Kept so the world can gate a
+        // location on an item without another emitter change.
+        b.AppendLine("# location name -> item name that must be received first");
+        b.AppendLine("LOCATION_REQUIRES = {");
+        b.AppendLine("}");
+        b.AppendLine();
+
         b.AppendLine("HOSTESS_CARDS = (");
         b.AppendLine($"    {Py("Erika's Business Card")},");
         b.AppendLine($"    {Py("Yuna's Business Card")},");
         b.AppendLine(")");
+        b.AppendLine();
+
+        b.AppendLine("# location name -> the level it needs. The YAML caps which exist.");
+        b.AppendLine("LEVEL_LOCATIONS = {");
+        for (var level = 2; level <= ApIds.MaxLevel; level++)
+            b.AppendLine($"    {Py(ApIds.LevelLocationName(level))}: {level},");
+        b.AppendLine("}");
         b.AppendLine();
 
         b.AppendLine("ABILITY_ITEMS = (");
@@ -107,19 +144,34 @@ public static class WorldEmitter
         // ranges rather than one flat list - a uniform choice over every variant
         // would weight ammo 20:1 against soul points.
         b.AppendLine($"AMMO_MIN, AMMO_MAX = {ApIds.AmmoMin}, {ApIds.AmmoMax}");
+        b.AppendLine($"AMMO_TYPES = ({string.Join(", ", ApIds.AmmoTypes.Select(a => Py(a.Name)))},)");
+        b.AppendLine("VANILLA_SHOP_ITEMS = (");
+        foreach (var id in ApIds.VanillaShopItems)
+        {
+            var nm = Inventory.KnownItems.TryGetValue(id, out var known) ? known : null;
+            if (nm is null || Inventory.IsPlaceholder(nm)) continue;
+            b.AppendLine($"    {Py(nm)},");
+        }
+        b.AppendLine(")");
+        b.AppendLine();
+        b.AppendLine("GUN_ITEMS = (");
+        foreach (var (_, name) in ApIds.Guns) b.AppendLine($"    {Py(name)},");
+        b.AppendLine(")");
+        b.AppendLine();
+        b.AppendLine("# locations that must never hold anything needed");
+        b.AppendLine("EXCLUDED_LOCATIONS = (");
+        for (var sh = 0; sh < ApIds.ShopDefs.Length; sh++)
+        {
+            var def = ApIds.ShopDefs[sh];
+            if (!def.Excluded || !ApIds.Reachable(def.Who)) continue;
+            for (var slot = 0; slot < def.Slots; slot++)
+                b.AppendLine($"    {Py(ApIds.ShopLocationName(def, slot))},");
+        }
+        b.AppendLine(")");
         b.AppendLine($"MONEY_AMOUNTS = ({string.Join(", ", ApIds.MoneyAmounts)},)");
-        b.AppendLine($"SOUL_POINTS_MIN, SOUL_POINTS_MAX = {ApIds.SoulPointsMin}, {ApIds.SoulPointsMax}");
         b.AppendLine();
-        b.AppendLine("# Exactly enough soul points to buy every ability. The world splits the");
-        b.AppendLine("# total into random 1-10 amounts using the seeded RNG, so it varies per seed.");
-        b.AppendLine($"SOUL_POINTS_TOTAL = {ApIds.TotalSoulPoints}");
-        b.AppendLine($"SOUL_POINT_ITEM_COUNT = {ApIds.SoulPointItemCount}");
-        b.AppendLine();
-        b.AppendLine("def ammo_item_name(rounds):");
-        b.AppendLine("    return f\"Submachine Gun Ammo ({rounds})\"");
-        b.AppendLine();
-        b.AppendLine("def soul_points_item_name(amount):");
-        b.AppendLine("    return f\"Soul Points ({amount})\"");
+        b.AppendLine("def ammo_item_name(kind, rounds):");
+        b.AppendLine("    return f\"{kind} ({rounds})\"");
         b.AppendLine();
         b.AppendLine("def money_item_name(yen):");
         b.AppendLine("    return f\"{yen:,} Yen\"");

@@ -14,7 +14,8 @@ public static class Abilities
     public const int Bytes = 8;
 
     // Cost is an optional 4th column in the TSV, in soul points. 0 means unknown.
-    public readonly record struct Ability(int Index, uint Address, int Bit, string Name, int Cost);
+    public readonly record struct Ability(
+        int Index, uint Address, int Bit, string Name, int Cost, string Requires);
 
     // Sum of the known costs. 0 while the TSV carries no cost column.
     public static int TotalCost => All.Sum(a => a.Cost);
@@ -45,7 +46,8 @@ public static class Abilities
             if (!int.TryParse(parts[1].Trim(), out var bit)) continue;
 
             var cost = parts.Length >= 4 && int.TryParse(parts[3].Trim(), out var c) ? c : 0;
-            list.Add(new Ability(list.Count, address, bit, parts[2].Trim(), cost));
+            var needs = parts.Length >= 5 ? parts[4].Trim() : "";
+            list.Add(new Ability(list.Count, address, bit, parts[2].Trim(), cost, needs));
         }
         return list;
     }

@@ -1,13 +1,16 @@
-import logging
-
-from BaseClasses import Item, ItemClassification, Location, Region, Tutorial
-from worlds.generic.Rules import add_item_rule
+from BaseClasses import (Item, ItemClassification, Location,
+                         LocationProgressType, Region, Tutorial)
+from worlds.generic.Rules import add_item_rule, set_rule
 from worlds.AutoWorld import WebWorld, World
 
 from .Data import (
     ABILITY_ITEMS,
     AMMO_MAX,
     AMMO_MIN,
+    AMMO_TYPES,
+    EXCLUDED_LOCATIONS,
+    GUN_ITEMS,
+    VANILLA_SHOP_ITEMS,
     MONEY_AMOUNTS,
     GAME_NAME,
     HOSTESS_CARDS,
@@ -15,15 +18,12 @@ from .Data import (
     CHAR_NONE,
     ITEM_CHARACTERS,
     ITEM_TABLE,
+    LEVEL_LOCATIONS,
     LOCATION_CHARACTERS,
+    LOCATION_REQUIRES,
     LOCATION_TABLE,
-    SOUL_POINTS_MAX,
-    SOUL_POINTS_MIN,
-    SOUL_POINTS_TOTAL,
-    SOUL_POINT_ITEM_COUNT,
     ammo_item_name,
     money_item_name,
-    soul_points_item_name,
 )
 from .Options import YakuzaDeadSoulsOptions
 
@@ -70,9 +70,19 @@ class YakuzaDeadSoulsWorld(World):
 
     origin_region_name = "Akiyama"
 
+    # Every level up to 100 is in the datapackage so ids never move between
+    # seeds, but only the ones the YAML asks for become real locations.
+    def _active_locations(self) -> dict[str, int]:
+        cap = self.options.max_level_check.value
+        return {
+            name: location_id
+            for name, location_id in LOCATION_TABLE.items()
+            if LEVEL_LOCATIONS.get(name, 0) <= cap
+        }
+
     def create_regions(self) -> None:
         akiyama = Region("Akiyama", self.player, self.multiworld)
-        akiyama.add_locations(LOCATION_TABLE, YakuzaDeadSoulsLocation)
+        akiyama.add_locations(self._active_locations(), YakuzaDeadSoulsLocation)
         self.multiworld.regions.append(akiyama)
 
     def create_item(self, name: str) -> YakuzaDeadSoulsItem:
@@ -82,11 +92,15 @@ class YakuzaDeadSoulsWorld(World):
         )
 
     def get_filler_item_name(self) -> str:
-        # Kind first, then amount, so adding variants to one kind does not
-        # change how often the other appears.
-        if self.random.random() < 0.5:
-            return ammo_item_name(self.random.randint(AMMO_MIN, AMMO_MAX))
-        return money_item_name(self.random.choice(MONEY_AMOUNTS))
+        # Kind first, then the detail, so adding variants to one kind does not
+        # change how often the others appear.
+        roll = self.random.random()
+        if roll < 0.35:
+            kind = self.random.choice(AMMO_TYPES)
+            return ammo_item_name(kind, self.random.randint(AMMO_MIN, AMMO_MAX))
+        if roll < 0.70:
+            return money_item_name(self.random.choice(MONEY_AMOUNTS))
+        return self.random.choice(VANILLA_SHOP_ITEMS)
 
     def create_items(self) -> None:
         cards = list(HOSTESS_CARDS)
@@ -98,45 +112,9 @@ class YakuzaDeadSoulsWorld(World):
 
         pool = [self.create_item(card) for card in cards]
         pool += [self.create_item(name) for name in ABILITY_ITEMS]
+        pool += [self.create_item(name) for name in GUN_ITEMS]
 
-        # Exactly enough soul points to buy every ability - no more, no less -
-        # split into random 1-10 amounts. Each starts at the minimum, then the
-        # remainder is scattered one point at a time over items with headroom,
-        # so the total is exact however the draw falls.
-        #
-        # The pool can be too small to carry them all: abilities are both a
-        # location and an item, so they cancel out and leave very little room.
-        # Clamp rather than overfill - Archipelago drops surplus items silently,
-        # which produces a seed where abilities can never be bought and nothing
-        # in the log says so.
-        free_slots = len(LOCATION_TABLE) - len(pool)
-        count = max(0, min(SOUL_POINT_ITEM_COUNT, free_slots))
-
-        amounts = [SOUL_POINTS_MIN] * count
-        headroom = [SOUL_POINTS_MAX - SOUL_POINTS_MIN] * count
-        remaining = SOUL_POINTS_TOTAL - SOUL_POINTS_MIN * count
-
-        candidates = [i for i in range(count) if headroom[i]]
-        while remaining > 0 and candidates:
-            i = self.random.choice(candidates)
-            amounts[i] += 1
-            headroom[i] -= 1
-            remaining -= 1
-            if not headroom[i]:
-                candidates.remove(i)
-
-        pool += [self.create_item(soul_points_item_name(a)) for a in amounts]
-
-        granted = sum(amounts)
-        if granted < SOUL_POINTS_TOTAL:
-            logging.warning(
-                "%s: only %d of %d soul points fit in %d locations, so not every "
-                "ability can be bought. Add more locations that are not also "
-                "items (shop purchases, substories) to close the gap.",
-                self.player_name, granted, SOUL_POINTS_TOTAL, len(LOCATION_TABLE),
-            )
-
-        remaining = len(LOCATION_TABLE) - len(pool)
+        remaining = len(self._active_locations()) - len(pool)
         pool += [self.create_item(self.get_filler_item_name()) for _ in range(remaining)]
 
         self.multiworld.itempool += pool
@@ -148,11 +126,14 @@ class YakuzaDeadSoulsWorld(World):
         return needed & location_characters == needed
 
     def set_rules(self) -> None:
+        # Only locations that were actually created exist to be looked up.
+        active = self._active_locations()
+
         # The story never lets you return to an earlier character's part, so a
         # location only one character can reach is missable for everyone after
         # them. Keep items a later character needs out of those.
         for name, characters in LOCATION_CHARACTERS.items():
-            if characters == 0:
+            if characters == 0 or name not in active:
                 continue
             location = self.multiworld.get_location(name, self.player)
             add_item_rule(
@@ -161,9 +142,23 @@ class YakuzaDeadSoulsWorld(World):
                 or self._may_place(item.name, c),
             )
 
-        # Every location is reachable from the start, so there are no access
-        # rules. Victory needs both hostesses maxed, which needs both cards;
-        # the client reports the actual win.
+        # Shops that stop existing partway through the story keep their slots as
+        # checks, but Archipelago must never route anything needed through them.
+        for name in EXCLUDED_LOCATIONS:
+            if name in active:
+                loc = self.multiworld.get_location(name, self.player)
+                loc.progress_type = LocationProgressType.EXCLUDED
+
+        for name, needed in LOCATION_REQUIRES.items():
+            if name not in active:
+                continue
+            set_rule(
+                self.multiworld.get_location(name, self.player),
+                lambda state, item=needed: state.has(item, self.player),
+            )
+
+        # Victory needs both hostesses maxed, which needs both cards; the client
+        # reports the actual win.
         player = self.player
         self.multiworld.completion_condition[player] = (
             lambda state: state.has_all(HOSTESS_CARDS, player)

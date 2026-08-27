@@ -1,0 +1,98 @@
+# id	name   -- the weapon block, delimited in the game's own table by
+# 'weapons start' (639) and 'End of weapons' (764). Delete rows to keep a
+# gun out of the Archipelago pool.
+640	ARASE SP-R
+641	ARASE SP-R2
+642	ARASE XR
+643	Hunting Shotgun
+644	Custom Shotgun
+645	Guy's Custom Shotgun
+646	New Balalaika
+647	Date Custom
+648	Date Special
+649	Bargain-Bin Automatic Rifle
+650	Repaired Automatic Rifle
+651	Refined Automatic Rifle
+652	Blackhawk
+653	Improved Blackhawk
+654	Ultimate Blackhawk
+655	Lightweight 9mm Automatic
+656	Lightweight Wk-CP11 Gang
+657	Lightweight Wk-CP21 Yakuza
+658	Hanabi
+659	Hanabi
+660	Hanabi
+661	9mm Automatic
+662	Wk-CP11 Gang
+663	Wk-CP21 Yakuza
+664	Golden Pistol
+665	Large Automatic Pistol
+666	Wk-CP35 Tiger
+667	Tiger Pistol
+668	Gangster's Pistol
+669	Macedonian Twins
+670	High & Low
+671	Elise
+672	Hunting Shotgun
+673	Path Maker
+674	Flesh Shredder
+675	Smoking Shotgun
+676	Fireworks Gun
+677	Mark IV EXP
+678	Meat Grinder
+679	MJM56 Crazy Dog
+680	MJM56-55 Exorcist
+681	Portable Gatling Gun Prototype
+682	XMG-RIMBO
+683	Kagutsuchi
+684	Girly Gatling Gun
+685	Love Shine Vulcan
+686	Kuroganemaru
+687	Modified Kuroganemaru
+688	Demon Slayer
+689	Dragon Arm
+690	New Balalaika
+691	Self-Defense Submachine Gun
+692	Hornet
+693	5.56mm Automatic Rifle
+694	YAR-18 Tojo Model
+695	Liberator
+696	SWS2 Sniper Rifle
+697	Sharp Shooter
+698	HSG-GARO
+699	XK.50 Anti-Materiel Rifle
+700	Zombie Masher
+701	Tank Killer
+702	Dragon Rifle
+703	Grenade Launcher
+704	Incendiary Grenade Launcher
+705	Stun Grenade Launcher
+706	Grenades
+707	Heavy Grenades
+708	Molotov Cocktails
+709	Incendiary Grenades
+710	Stun Grenades
+711	Anti-Tank Missile Launcher
+712	Satellite Laser
+713	Standard Automatic Rifle
+714	Bootleg Pistol
+715	Paper Fan
+716	Pursuit Handgun
+717	BB Gun
+718	Handgun
+719	Modified Handgun
+720	Handgun DX
+721	Dual Handguns
+722	Modified Dual Handguns
+723	Dual Handguns DX
+724	Shotgun
+725	Modified Shotgun
+726	Fireworks Shotgun
+727	Assault Rifle
+728	Modified Assault Rifle
+729	Assault Rifle DX
+730	Grenade Launcher
+731	Modified Grenade Launcher
+732	Grenade Launcher DX
+733	Anti-Tank Missile Launcher
+734	Grenades

@@ -16,6 +16,21 @@ if (Array.IndexOf(args, "--emit-world") is var emitAt and >= 0)
     return 0;
 }
 
+// A mistyped flag used to fall through to the default silently: `-- port 43899`
+// connected to 38281 and failed with a confusing timeout. Reject anything
+// unrecognised instead.
+string[] known = ["--slot", "--ap", "--port", "--password", "--host",
+                  "--no-notify", "--emit-world", "--help"];
+var unknown = args.Where(a => a.StartsWith("--") && !known.Contains(a)).ToArray();
+var stray = args.Where(a => a == "--").ToArray();
+if (unknown.Length > 0 || stray.Length > 0)
+{
+    foreach (var a in unknown) Console.WriteLine($"unknown option: {a}");
+    if (stray.Length > 0) Console.WriteLine("stray '--' (did you type '-- port' instead of '--port'?)");
+    Usage();
+    return 1;
+}
+
 // No arguments means it was double-clicked, so ask instead of exiting.
 var interactive = args.Length == 0;
 
