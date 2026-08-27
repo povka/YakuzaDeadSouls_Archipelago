@@ -24,13 +24,15 @@ public static class Hostesses
     public static bool IsAvailable(GameProcess game, in Hostess h) =>
         game.ReadU32(h.Record + Availability) != 0;
 
-    // The availability u32 also carries her progress, so it is only ever written
-    // when empty. Writing a bare 1 over a started hostess destroys three bytes
-    // of her record.
+    // This u32 carries her progress as well as her availability, so anything but
+    // 0 or 1 means she has been played and must not be overwritten in either
+    // direction. Locking a progressed hostess is pointless anyway - she is
+    // already started.
     public static void SetAvailable(GameProcess game, in Hostess h, bool available)
     {
         var current = game.ReadU32(h.Record + Availability);
-        if (available && current != 0) return;
+        if (current > 1) return;
+        if (current == (available ? 1u : 0u)) return;
 
         var buf = new byte[4];
         BinaryPrimitives.WriteUInt32BigEndian(buf, available ? 1u : 0u);

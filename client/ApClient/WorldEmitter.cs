@@ -41,6 +41,8 @@ public static class WorldEmitter
         }
         foreach (var (id, name) in ApIds.Guns)
             b.AppendLine($"    {Py(name)}: ({ApIds.GameItemId(id)}, \"useful\"),");
+        foreach (var (id, name) in ApIds.Gifts)
+            b.AppendLine($"    {Py(name)}: ({ApIds.GameItemId(id)}, \"useful\"),");
         for (var i = 0; i < ApIds.MoneyAmounts.Length; i++)
             b.AppendLine($"    {Py(ApIds.MoneyItemName(ApIds.MoneyAmounts[i]))}: " +
                          $"({ApIds.MoneyBase + i}, \"filler\"),");
@@ -156,6 +158,10 @@ public static class WorldEmitter
         b.AppendLine();
         b.AppendLine("GUN_ITEMS = (");
         foreach (var (_, name) in ApIds.Guns) b.AppendLine($"    {Py(name)},");
+        b.AppendLine(")");
+        b.AppendLine();
+        b.AppendLine("GIFT_ITEMS = (");
+        foreach (var (_, name) in ApIds.Gifts) b.AppendLine($"    {Py(name)},");
         b.AppendLine(")");
         b.AppendLine();
         b.AppendLine("# locations that must never hold anything needed");

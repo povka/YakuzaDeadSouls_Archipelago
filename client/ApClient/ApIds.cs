@@ -263,6 +263,12 @@ public static class ApIds
     // share this namespace, so their ids can never collide.
     public const long GameItemBase = BaseId + 30_000;
 
+    // Declared before VanillaShopItems: static field initializers run in
+    // declaration order, and that one filters gifts out of the filler pool.
+    public static readonly (ushort Id, string Name)[] Gifts = LoadItemList("gifts.tsv");
+
+    public static readonly HashSet<ushort> GiftIds = [.. Gifts.Select(g => g.Id)];
+
     public static readonly ushort[] VanillaShopItems = LoadVanillaShopItems();
 
     private static ushort[] LoadVanillaShopItems()
@@ -277,8 +283,12 @@ public static class ApIds
             if (parts.Length < 6) continue;
             foreach (var entry in parts[5].Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
+                // A gift is a `useful` item, so it must not also be emitted as
+                // filler - ITEM_TABLE is keyed by name and one would overwrite
+                // the other.
                 var colon = entry.IndexOf(':');
-                if (colon > 0 && ushort.TryParse(entry[..colon], out var id) && id > 1) ids.Add(id);
+                if (colon > 0 && ushort.TryParse(entry[..colon], out var id)
+                    && id > 1 && !GiftIds.Contains(id)) ids.Add(id);
             }
         }
         return [.. ids];
@@ -293,6 +303,24 @@ public static class ApIds
     }
 
     public static readonly (ushort Id, string Name)[] Guns = LoadGuns();
+
+    private static (ushort Id, string Name)[] LoadItemList(string file)
+    {
+        var path = FindData(file);
+        if (path is null) return [];
+        var list = new List<(ushort, string)>();
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var line in File.ReadLines(path))
+        {
+            if (line.StartsWith('#') || line.Trim().Length == 0) continue;
+            var parts = line.Split('	');
+            if (parts.Length < 2 || !ushort.TryParse(parts[0].Trim(), out var id)) continue;
+            var raw = parts[1].Trim();
+            if (raw.Length == 0 || Inventory.IsPlaceholder(raw)) continue;
+            list.Add((id, GunName(raw, seen)));
+        }
+        return [.. list];
+    }
 
     private static (ushort Id, string Name)[] LoadGuns()
     {

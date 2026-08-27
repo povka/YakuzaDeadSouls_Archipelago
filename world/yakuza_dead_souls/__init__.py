@@ -9,6 +9,7 @@ from .Data import (
     AMMO_MIN,
     AMMO_TYPES,
     EXCLUDED_LOCATIONS,
+    GIFT_ITEMS,
     GUN_ITEMS,
     VANILLA_SHOP_ITEMS,
     MONEY_AMOUNTS,
@@ -113,6 +114,7 @@ class YakuzaDeadSoulsWorld(World):
         pool = [self.create_item(card) for card in cards]
         pool += [self.create_item(name) for name in ABILITY_ITEMS]
         pool += [self.create_item(name) for name in GUN_ITEMS]
+        pool += [self.create_item(name) for name in GIFT_ITEMS]
 
         remaining = len(self._active_locations()) - len(pool)
         pool += [self.create_item(self.get_filler_item_name()) for _ in range(remaining)]
